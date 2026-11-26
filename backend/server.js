@@ -1,3 +1,4 @@
+
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -13,6 +14,7 @@ const authRoutes = require("./routes/authRoutes");
 
 const app = express();
 
+// CORS configuration
 const allowedOrigins = [
   "http://localhost:3000",
   "https://ai-health-p8fh.vercel.app"
@@ -36,40 +38,49 @@ app.use(
   })
 );
 
-
 // Middleware
 app.use(express.json());
 
-// MongoDB connection
-mongoose
-.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("MongoDB connected successfully");
-  })
-  .catch((error) => {
-    console.log("MongoDB connection failed");
-    console.log(error.message);
+// Root route
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Health AI Backend is running successfully!"
   });
-  
-  // Root route
-  app.get("/", (req, res) => {
-    res.json({
-      success: true,
-      message: "Health AI Backend is running successfully!"
-    });
-  });
-  
-  // Existing API routes
-  app.use("/api/auth", authRoutes);
+});
+
+// Existing API routes
+app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/symptoms", symptomRoutes);
 app.use("/api/analysis/image", imageAnalysisRoutes);
-// Server
-const PORT = process.env.PORT || 5000;
 
+// MongoDB connection and server startup
+const startServer = async () => {
+  try {
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is missing in environment variables");
+    }
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 15000
+    });
+
+    console.log("MongoDB connected successfully");
+
+    const PORT = process.env.PORT || 5000;
+
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+
+  } catch (error) {
+    console.error("MongoDB connection failed:");
+    console.error(error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
