@@ -2,9 +2,10 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import Navbar from "../components/Navbar";
+import API_URL from "../config";
 import "./ImageAnalysis.css";
 
-const API_URL = "http://localhost:5000";
+const BASE_URL = API_URL.replace(/\/$/, "");
 
 export default function ImageAnalysis() {
   const [file, setFile] = useState(null);
@@ -75,10 +76,17 @@ export default function ImageAnalysis() {
       const formData = new FormData();
       formData.append("image", file);
 
+      const token = localStorage.getItem("token");
+
       const response = await axios.post(
-        `${API_URL}/api/analysis/image`,
+        `${BASE_URL}/api/analysis/image`,
         formData,
-        { timeout: 60000 }
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          timeout: 60000,
+        }
       );
 
       const data = response.data;
@@ -118,11 +126,26 @@ export default function ImageAnalysis() {
           "Educational prototype only. This model has not been clinically validated and is not a diagnostic tool.",
       });
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Image analysis failed. Check that the Node.js backend and Flask ML service are running."
-      );
+      console.error("Image analysis error:", err);
+
+      if (err.response) {
+        setError(
+          err.response.data?.message ||
+            `Server error: ${err.response.status}`
+        );
+      } else if (err.code === "ECONNABORTED") {
+        setError(
+          "Request timed out. The ML service may be taking too long. Please try again."
+        );
+      } else if (err.request) {
+        setError(
+          "Cannot connect to the backend. Check whether your deployed Node.js backend is running."
+        );
+      } else {
+        setError(
+          err.message || "Image analysis failed. Please try again."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -135,6 +158,7 @@ export default function ImageAnalysis() {
     setError("");
 
     const input = document.getElementById("medical-file");
+
     if (input) {
       input.value = "";
     }
@@ -277,13 +301,10 @@ export default function ImageAnalysis() {
                 </p>
               )}
 
-              
-
               <p className="image-analysis-disclaimer">
                 {result.disclaimer} Consult a qualified
                 healthcare professional for interpretation.
               </p>
-
             </section>
           )}
 

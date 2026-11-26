@@ -3,29 +3,29 @@ import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import API_URL from "../config";
 import "./DoctorAppointments.css";
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE_URL = API_URL.replace(/\/$/, "");
 
 function DoctorAppointments() {
   const navigate = useNavigate();
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState(null);
 
-  // ==========================================
   // FETCH DOCTOR APPOINTMENTS
-  // ==========================================
-
   const fetchAppointments = useCallback(async () => {
     const currentToken = localStorage.getItem("token");
     const role = (
       localStorage.getItem("role") || ""
-    ).trim().toLowerCase();
+    )
+      .trim()
+      .toLowerCase();
 
     if (!currentToken) {
       setError("Login session not found. Please login again.");
@@ -42,26 +42,29 @@ function DoctorAppointments() {
     }
 
     try {
-      setLoading(true);
       setError("");
+      setRefreshing(true);
 
       const response = await axios.get(
-        `${API_URL}/api/appointments/doctor`,
+        `${BASE_URL}/api/appointments/doctor`,
         {
           headers: {
-            Authorization: `Bearer ${currentToken}`
-          }
+            Authorization: `Bearer ${currentToken}`,
+          },
+          timeout: 30000,
         }
       );
 
-      const appointmentData = response.data.appointments;
+      const appointmentData =
+        response.data?.appointments ?? response.data;
 
-      setAppointments(
-        Array.isArray(appointmentData)
-          ? appointmentData
-          : []
-      );
+      if (!Array.isArray(appointmentData)) {
+        throw new Error(
+          "Invalid appointment data received from server."
+        );
+      }
 
+      setAppointments(appointmentData);
     } catch (err) {
       console.error(
         "Fetch appointments error:",
@@ -78,29 +81,31 @@ function DoctorAppointments() {
       }
 
       if (err.response?.status === 403) {
-        setError("Only doctors can access these appointments.");
+        setError(
+          "Only doctors can access these appointments."
+        );
+      } else if (err.code === "ECONNABORTED") {
+        setError(
+          "Request timed out. Please try refreshing."
+        );
       } else {
         setError(
           err.response?.data?.message ||
-          "Unable to fetch appointment requests."
+            err.message ||
+            "Unable to fetch appointment requests."
         );
       }
-
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [navigate]);
-
 
   useEffect(() => {
     fetchAppointments();
   }, [fetchAppointments]);
 
-
-  // ==========================================
   // UPDATE APPOINTMENT STATUS
-  // ==========================================
-
   const updateStatus = async (appointmentId, status) => {
     const currentToken = localStorage.getItem("token");
 
@@ -115,39 +120,44 @@ function DoctorAppointments() {
       setError("");
 
       await axios.patch(
-        `${API_URL}/api/appointments/${appointmentId}/status`,
+        `${BASE_URL}/api/appointments/${appointmentId}/status`,
         { status },
         {
           headers: {
-            Authorization: `Bearer ${currentToken}`
-          }
+            Authorization: `Bearer ${currentToken}`,
+          },
+          timeout: 30000,
         }
       );
 
       // Refresh appointment list
       await fetchAppointments();
-
     } catch (err) {
       console.error(
         "Update status error:",
         err.response?.data || err.message
       );
 
+      if (err.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        localStorage.removeItem("user");
+
+        navigate("/login", { replace: true });
+        return;
+      }
+
       setError(
         err.response?.data?.message ||
-        "Unable to update appointment status."
+          err.message ||
+          "Unable to update appointment status."
       );
-
     } finally {
       setUpdatingId(null);
     }
   };
 
-
-  // ==========================================
   // DATE FORMATTING
-  // ==========================================
-
   const formatDate = (date) => {
     if (!date) return "Not available";
 
@@ -160,24 +170,15 @@ function DoctorAppointments() {
     return parsedDate.toLocaleString();
   };
 
-
-  // ==========================================
   // FILTER APPOINTMENTS
-  // ==========================================
-
   const filteredAppointments = appointments.filter(
     (appointment) => {
       if (filter === "all") return true;
-
       return appointment.status === filter;
     }
   );
 
-
-  // ==========================================
   // APPOINTMENT STATISTICS
-  // ==========================================
-
   const pending = appointments.filter(
     (a) => a.status === "pending"
   ).length;
@@ -194,11 +195,7 @@ function DoctorAppointments() {
     (a) => a.status === "completed"
   ).length;
 
-
-  // ==========================================
   // UI
-  // ==========================================
-
   return (
     <>
       <Navbar />
@@ -207,15 +204,12 @@ function DoctorAppointments() {
 
         {/* Page Heading */}
         <section className="appointments-heading">
-
           <div>
             <p className="appointments-subtitle">
               DOCTOR PORTAL
             </p>
 
-            <h1>
-              Patient Appointments
-            </h1>
+            <h1>Patient Appointments</h1>
 
             <p>
               View patient requests and manage appointment status.
@@ -226,17 +220,14 @@ function DoctorAppointments() {
             type="button"
             className="refresh-appointments-btn"
             onClick={fetchAppointments}
-            disabled={loading}
+            disabled={refreshing}
           >
-            ↻ Refresh
+            {refreshing ? "Refreshing..." : "↻ Refresh"}
           </button>
-
         </section>
-
 
         {/* Appointment Statistics */}
         <section className="appointment-summary">
-
           <div className="summary-card">
             <h2>{appointments.length}</h2>
             <p>Total Requests</p>
@@ -261,9 +252,7 @@ function DoctorAppointments() {
             <h2>{completed}</h2>
             <p>Completed</p>
           </div>
-
         </section>
-
 
         {/* Error Message */}
         {error && (
@@ -272,15 +261,10 @@ function DoctorAppointments() {
           </div>
         )}
 
-
         {/* Appointment Requests */}
         <section className="appointments-content">
-
           <div className="appointments-filter">
-
-            <h2>
-              Appointment Requests
-            </h2>
+            <h2>Appointment Requests</h2>
 
             <select
               value={filter}
@@ -292,51 +276,33 @@ function DoctorAppointments() {
               <option value="rejected">Rejected</option>
               <option value="completed">Completed</option>
             </select>
-
           </div>
 
-
           {loading ? (
-
             <div className="appointments-empty">
               <h3>Loading appointments...</h3>
             </div>
-
           ) : filteredAppointments.length === 0 ? (
-
             <div className="appointments-empty">
+              <div className="empty-calendar">📅</div>
 
-              <div className="empty-calendar">
-                📅
-              </div>
-
-              <h3>
-                No Appointments Found
-              </h3>
+              <h3>No Appointments Found</h3>
 
               <p>
                 Patient appointment requests will appear here
                 when someone books an appointment with you.
               </p>
-
             </div>
-
           ) : (
-
             <div className="doctor-requests-list">
-
               {filteredAppointments.map((appointment) => (
-
                 <article
                   className="doctor-request-card"
                   key={appointment._id}
                 >
-
                   {/* Patient Information */}
                   <div className="request-top">
-
                     <div className="patient-info">
-
                       <div className="patient-avatar">
                         {appointment.patient?.name
                           ?.charAt(0)
@@ -344,7 +310,6 @@ function DoctorAppointments() {
                       </div>
 
                       <div>
-
                         <h3>
                           {appointment.patient?.name ||
                             "Unknown Patient"}
@@ -354,28 +319,20 @@ function DoctorAppointments() {
                           {appointment.patient?.email ||
                             "Email unavailable"}
                         </p>
-
                       </div>
-
                     </div>
-
 
                     <span
                       className={`appointment-status ${appointment.status}`}
                     >
                       {appointment.status}
                     </span>
-
                   </div>
-
 
                   {/* Appointment Details */}
                   <div className="request-details">
-
                     <div>
-                      <span>
-                        Appointment Date
-                      </span>
+                      <span>Appointment Date</span>
 
                       <strong>
                         {formatDate(appointment.appointmentDate)}
@@ -383,35 +340,25 @@ function DoctorAppointments() {
                     </div>
 
                     <div>
-                      <span>
-                        Request Submitted
-                      </span>
+                      <span>Request Submitted</span>
 
                       <strong>
-                        {appointment.createdAt
-                          ? formatDate(appointment.createdAt)
-                          : "Not available"}
+                        {formatDate(appointment.createdAt)}
                       </strong>
                     </div>
 
                     <div className="reason-detail">
-                      <span>
-                        Reason for Appointment
-                      </span>
+                      <span>Reason for Appointment</span>
 
                       <strong>
                         {appointment.reason || "Not specified"}
                       </strong>
                     </div>
-
                   </div>
-
 
                   {/* Pending Appointment Actions */}
                   {appointment.status === "pending" && (
-
                     <div className="request-actions">
-
                       <button
                         type="button"
                         className="accept-appointment-btn"
@@ -428,7 +375,6 @@ function DoctorAppointments() {
                           : "✓ Accept Request"}
                       </button>
 
-
                       <button
                         type="button"
                         className="reject-appointment-btn"
@@ -444,17 +390,12 @@ function DoctorAppointments() {
                           ? "Updating..."
                           : "✕ Reject Request"}
                       </button>
-
                     </div>
-
                   )}
-
 
                   {/* Accepted Appointment Action */}
                   {appointment.status === "accepted" && (
-
                     <div className="request-actions">
-
                       <button
                         type="button"
                         className="complete-appointment-btn"
@@ -470,41 +411,27 @@ function DoctorAppointments() {
                           ? "Updating..."
                           : "Mark as Completed"}
                       </button>
-
                     </div>
-
                   )}
-
 
                   {/* Rejected Status */}
                   {appointment.status === "rejected" && (
-
                     <p className="final-status-message">
                       This appointment request was rejected.
                     </p>
-
                   )}
-
 
                   {/* Completed Status */}
                   {appointment.status === "completed" && (
-
                     <p className="final-status-message">
                       This appointment has been completed.
                     </p>
-
                   )}
-
                 </article>
-
               ))}
-
             </div>
-
           )}
-
         </section>
-
       </main>
     </>
   );

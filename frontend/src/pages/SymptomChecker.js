@@ -3,8 +3,9 @@ import { useState } from "react";
 import axios from "axios";
 import Navbar from "../components/Navbar";
 import "./SymptomChecker.css";
+import API_URL from "../config";
 
-const API_URL = "http://localhost:5000";
+const BASE_URL = API_URL.replace(/\/$/, "");
 
 export default function SymptomChecker() {
   const [symptoms, setSymptoms] = useState([]);
@@ -50,22 +51,35 @@ export default function SymptomChecker() {
       setError("");
       setResult(null);
 
+      const token = localStorage.getItem("token");
+
       const response = await axios.post(
-        `${API_URL}/api/symptoms/check`,
-        { symptoms },
-        { timeout: 60000 }
+        `${BASE_URL}/api/symptoms/check`,
+        {
+          symptoms,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token
+              ? { Authorization: `Bearer ${token}` }
+              : {}),
+          },
+          timeout: 60000,
+        }
       );
 
       const data = response.data;
 
       console.log("Backend response:", data);
 
-      // Validate the backend response format.
+      // Validate backend response
       if (
         data?.success !== true ||
         !Array.isArray(data.results)
       ) {
         throw new Error(
+          data?.message ||
           "Unexpected response from the backend. Please check the API response."
         );
       }
@@ -76,7 +90,6 @@ export default function SymptomChecker() {
         );
       }
 
-      // The backend returns results as an array.
       const prediction = data.results[0];
 
       if (
@@ -88,7 +101,6 @@ export default function SymptomChecker() {
         );
       }
 
-      // Adapt the backend fields to the existing result UI.
       setResult({
         prediction: prediction.condition,
         message:
@@ -112,11 +124,24 @@ export default function SymptomChecker() {
         err.response?.data || err.message
       );
 
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Unable to analyze symptoms. Please check your backend and ML service."
-      );
+      let errorMessage =
+        "Unable to analyze symptoms. Please try again.";
+
+      if (err.response) {
+        errorMessage =
+          err.response.data?.message ||
+          `Backend error: ${err.response.status}`;
+      } else if (err.code === "ECONNABORTED") {
+        errorMessage =
+          "The request timed out. Your backend or ML service may be taking too long.";
+      } else if (err.message === "Network Error") {
+        errorMessage =
+          "Cannot connect to the backend. Check your Render backend URL, service status, and CORS settings.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -151,6 +176,7 @@ export default function SymptomChecker() {
                     }
                     disabled={loading}
                   />
+
                   <span>{symptom}</span>
                 </label>
               ))}
@@ -173,6 +199,7 @@ export default function SymptomChecker() {
                 role="status"
               >
                 <div className="spinner"></div>
+
                 <p>
                   Please wait while we analyze your symptoms...
                 </p>
@@ -192,7 +219,7 @@ export default function SymptomChecker() {
 
               <article className="result-card">
                 <h3>
-                  {result.prediction.replaceAll("_", " ")}
+                  {result.prediction.replace(/_/g, " ")}
                 </h3>
 
                 <p>{result.message}</p>
@@ -218,7 +245,7 @@ export default function SymptomChecker() {
                   {result.demo ? "Yes" : "No"}
                 </p>
 
-                <p>
+                <p className="result-disclaimer">
                   This is a software integration demonstration,
                   not a medical diagnosis. Do not use this
                   prediction to make healthcare decisions.

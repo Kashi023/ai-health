@@ -2,10 +2,10 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
+import API_URL from "../config";
 import "./DoctorRegister.css";
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE_URL = API_URL.replace(/\/$/, "");
 
 function DoctorRegister() {
   const navigate = useNavigate();
@@ -19,34 +19,27 @@ function DoctorRegister() {
     qualification: "",
     hospital: "",
     consultationFee: "",
-    bio: ""
+    bio: "",
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // ==========================================
   // HANDLE INPUT CHANGES
-  // ==========================================
-
   const handleChange = (e) => {
     const { name, value } = e.target;
 
     setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
 
     setError("");
     setSuccess("");
   };
 
-
-  // ==========================================
   // VALIDATE FORM
-  // ==========================================
-
   const validateForm = () => {
     if (!formData.name.trim()) {
       return "Please enter your full name.";
@@ -56,7 +49,11 @@ function DoctorRegister() {
       return "Please enter your email address.";
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+    if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        formData.email.trim()
+      )
+    ) {
       return "Please enter a valid email address.";
     }
 
@@ -95,11 +92,7 @@ function DoctorRegister() {
     return "";
   };
 
-
-  // ==========================================
   // REGISTER DOCTOR
-  // ==========================================
-
   const handleRegister = async (e) => {
     e.preventDefault();
 
@@ -125,25 +118,30 @@ function DoctorRegister() {
         qualification: formData.qualification.trim(),
         hospital: formData.hospital.trim(),
         consultationFee: Number(formData.consultationFee),
-        bio: formData.bio.trim()
+        bio: formData.bio.trim(),
       };
 
       const response = await axios.post(
-        `${API_URL}/api/doctors/register`,
-        doctorData
+        `${BASE_URL}/api/doctors/register`,
+        doctorData,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          timeout: 30000,
+        }
       );
 
       setSuccess(
-        response.data.message ||
-        "Doctor registered successfully!"
+        response.data?.message ||
+          "Doctor registered successfully!"
       );
 
-      // Do not automatically log in unless the backend
-      // also returns a valid authentication token.
+      // Navigate to doctor login after successful registration.
       setTimeout(() => {
         navigate("/login", {
           replace: true,
-          state: { role: "doctor" }
+          state: { role: "doctor" },
         });
       }, 1200);
 
@@ -153,56 +151,67 @@ function DoctorRegister() {
         err.response?.data || err.message
       );
 
-      setError(
-        err.response?.data?.message ||
-        "Doctor registration failed. Please try again."
-      );
-
+      if (err.response) {
+        setError(
+          err.response.data?.message ||
+            `Registration failed. Server returned ${err.response.status}.`
+        );
+      } else if (err.code === "ECONNABORTED") {
+        setError(
+          "Request timed out. Please try again."
+        );
+      } else if (err.request) {
+        setError(
+          "Cannot connect to the backend. Please check whether the backend server is running."
+        );
+      } else {
+        setError(
+          err.message ||
+            "Doctor registration failed. Please try again."
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
 
-
-  // ==========================================
   // UI
-  // ==========================================
-
   return (
     <div className="doctor-register-container">
-
       <div className="doctor-register-card">
 
-        {/* Header */}
         <div className="doctor-register-header">
           <h1>HealthAI</h1>
           <h2>Doctor Registration</h2>
           <p>Create your professional doctor account</p>
         </div>
 
-
         <form onSubmit={handleRegister}>
 
-          {/* Error Message */}
           {error && (
-            <div className="doctor-register-error" role="alert">
+            <div
+              className="doctor-register-error"
+              role="alert"
+            >
               {error}
             </div>
           )}
 
-          {/* Success Message */}
           {success && (
-            <div className="doctor-register-success" role="status">
+            <div
+              className="doctor-register-success"
+              role="status"
+            >
               {success}
             </div>
           )}
 
-
-          {/* Personal Information */}
           <h3>Personal Information</h3>
 
           <div className="form-group">
-            <label htmlFor="doctor-name">Doctor Name *</label>
+            <label htmlFor="doctor-name">
+              Doctor Name *
+            </label>
 
             <input
               id="doctor-name"
@@ -217,9 +226,10 @@ function DoctorRegister() {
             />
           </div>
 
-
           <div className="form-group">
-            <label htmlFor="doctor-email">Email Address *</label>
+            <label htmlFor="doctor-email">
+              Email Address *
+            </label>
 
             <input
               id="doctor-email"
@@ -232,9 +242,10 @@ function DoctorRegister() {
             />
           </div>
 
-
           <div className="form-group">
-            <label htmlFor="doctor-password">Password *</label>
+            <label htmlFor="doctor-password">
+              Password *
+            </label>
 
             <input
               id="doctor-password"
@@ -248,8 +259,6 @@ function DoctorRegister() {
             />
           </div>
 
-
-          {/* Professional Information */}
           <h3>Professional Information</h3>
 
           <div className="form-group">
@@ -284,7 +293,6 @@ function DoctorRegister() {
             </select>
           </div>
 
-
           <div className="form-group">
             <label htmlFor="experience">
               Experience (Years) *
@@ -303,7 +311,6 @@ function DoctorRegister() {
             />
           </div>
 
-
           <div className="form-group">
             <label htmlFor="qualification">
               Qualification *
@@ -320,7 +327,6 @@ function DoctorRegister() {
             />
           </div>
 
-
           <div className="form-group">
             <label htmlFor="hospital">
               Hospital / Clinic
@@ -335,7 +341,6 @@ function DoctorRegister() {
               onChange={handleChange}
             />
           </div>
-
 
           <div className="form-group">
             <label htmlFor="consultationFee">
@@ -354,7 +359,6 @@ function DoctorRegister() {
               required
             />
           </div>
-
 
           <div className="form-group">
             <label htmlFor="bio">
@@ -376,8 +380,6 @@ function DoctorRegister() {
             </small>
           </div>
 
-
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
@@ -389,15 +391,12 @@ function DoctorRegister() {
 
         </form>
 
-
-        {/* Login Link */}
         <p className="doctor-login-link">
           Already registered?{" "}
           <Link to="/login">Login here</Link>
         </p>
 
       </div>
-
     </div>
   );
 }

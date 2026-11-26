@@ -3,10 +3,10 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Navbar from "../components/Navbar";
+import API_URL from "../config";
 import "./DoctorDashboard.css";
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE_URL = API_URL.replace(/\/$/, "");
 
 function DoctorDashboard() {
   const navigate = useNavigate();
@@ -23,15 +23,14 @@ function DoctorDashboard() {
     .trim()
     .toLowerCase();
 
-  // ==========================================
   // FETCH DOCTOR PROFILE AND APPOINTMENTS
-  // ==========================================
-
   const fetchDoctorData = useCallback(async () => {
     const currentToken = localStorage.getItem("token");
     const currentRole = (
       localStorage.getItem("role") || ""
-    ).trim().toLowerCase();
+    )
+      .trim()
+      .toLowerCase();
 
     if (!currentToken || currentRole !== "doctor") {
       setLoading(false);
@@ -45,20 +44,27 @@ function DoctorDashboard() {
 
       const config = {
         headers: {
-          Authorization: `Bearer ${currentToken}`
-        }
+          Authorization: `Bearer ${currentToken}`,
+        },
+        timeout: 30000,
       };
 
       const [profileResponse, appointmentResponse] =
         await Promise.all([
-          axios.get(`${API_URL}/api/doctors/profile`, config),
-          axios.get(`${API_URL}/api/appointments/doctor`, config)
+          axios.get(
+            `${BASE_URL}/api/doctors/profile`,
+            config
+          ),
+          axios.get(
+            `${BASE_URL}/api/appointments/doctor`,
+            config
+          ),
         ]);
 
       // Extract doctor profile
       const doctor =
-        profileResponse.data.doctor ||
-        profileResponse.data.user ||
+        profileResponse.data?.doctor ||
+        profileResponse.data?.user ||
         profileResponse.data;
 
       if (!doctor || !doctor.name) {
@@ -69,14 +75,16 @@ function DoctorDashboard() {
 
       // Extract appointment data
       const appointmentData =
-        appointmentResponse.data.appointments;
+        appointmentResponse.data?.appointments ??
+        appointmentResponse.data;
 
-      setAppointments(
-        Array.isArray(appointmentData)
-          ? appointmentData
-          : []
-      );
+      if (!Array.isArray(appointmentData)) {
+        throw new Error(
+          "Invalid appointment data received from server."
+        );
+      }
 
+      setAppointments(appointmentData);
     } catch (err) {
       console.error(
         "Doctor dashboard error:",
@@ -93,31 +101,27 @@ function DoctorDashboard() {
       }
 
       if (err.response?.status === 403) {
-        setError("Only doctors can access this dashboard.");
+        setError(
+          "Only doctors can access this dashboard."
+        );
       } else {
         setError(
           err.response?.data?.message ||
-          err.message ||
-          "Unable to load doctor dashboard."
+            err.message ||
+            "Unable to load doctor dashboard."
         );
       }
-
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [navigate]);
 
-
   useEffect(() => {
     fetchDoctorData();
   }, [fetchDoctorData]);
 
-
-  // ==========================================
   // UPDATE APPOINTMENT STATUS
-  // ==========================================
-
   const updateAppointment = async (appointmentId, status) => {
     const currentToken = localStorage.getItem("token");
 
@@ -131,18 +135,17 @@ function DoctorDashboard() {
       setError("");
 
       await axios.patch(
-        `${API_URL}/api/appointments/${appointmentId}/status`,
+        `${BASE_URL}/api/appointments/${appointmentId}/status`,
         { status },
         {
           headers: {
-            Authorization: `Bearer ${currentToken}`
-          }
+            Authorization: `Bearer ${currentToken}`,
+          },
+          timeout: 30000,
         }
       );
 
-      // Reload updated appointment data
       await fetchDoctorData();
-
     } catch (err) {
       console.error(
         "Appointment update error:",
@@ -160,19 +163,15 @@ function DoctorDashboard() {
 
       setError(
         err.response?.data?.message ||
-        "Unable to update appointment."
+          err.message ||
+          "Unable to update appointment."
       );
-
     } finally {
       setUpdatingId(null);
     }
   };
 
-
-  // ==========================================
   // FORMAT DATE
-  // ==========================================
-
   const formatDate = (date, includeTime = true) => {
     if (!date) return "Not available";
 
@@ -187,20 +186,12 @@ function DoctorDashboard() {
       : parsedDate.toLocaleDateString();
   };
 
-
-  // ==========================================
   // AUTHENTICATION CHECK
-  // ==========================================
-
   if (!token || role !== "doctor") {
     return <Navigate to="/login" replace />;
   }
 
-
-  // ==========================================
   // LOADING STATE
-  // ==========================================
-
   if (loading) {
     return (
       <>
@@ -213,18 +204,13 @@ function DoctorDashboard() {
     );
   }
 
-
-  // ==========================================
   // PROFILE ERROR STATE
-  // ==========================================
-
   if (!user) {
     return (
       <>
         <Navbar />
 
         <main className="dashboard doctor-dashboard">
-
           <div className="doctor-error">
             {error || "Unable to load your doctor profile."}
           </div>
@@ -236,17 +222,12 @@ function DoctorDashboard() {
           >
             {refreshing ? "Loading..." : "Try Again"}
           </button>
-
         </main>
       </>
     );
   }
 
-
-  // ==========================================
   // APPOINTMENT STATISTICS
-  // ==========================================
-
   const pendingCount = appointments.filter(
     (item) => item.status === "pending"
   ).length;
@@ -263,11 +244,7 @@ function DoctorDashboard() {
     (item) => item.status === "completed"
   ).length;
 
-
-  // ==========================================
   // DASHBOARD UI
-  // ==========================================
-
   return (
     <>
       <Navbar />
@@ -276,19 +253,20 @@ function DoctorDashboard() {
 
         {/* Welcome Section */}
         <section className="welcome-section">
-
           <div>
             <p className="small-title">
               DOCTOR PORTAL
             </p>
 
             <h1>
-              Welcome, <span>Dr. {user.name || "Doctor"}.</span>
+              Welcome,{" "}
+              <span>Dr. {user.name || "Doctor"}.</span>
             </h1>
 
             <p className="welcome-text">
               Manage your healthcare activities, connect with
-              patients, and review appointment requests through HealthAI.
+              patients, and review appointment requests through
+              HealthAI.
             </p>
 
             <a
@@ -299,16 +277,10 @@ function DoctorDashboard() {
             </a>
           </div>
 
-
           <div className="ai-card">
+            <div className="ai-icon">⚕</div>
 
-            <div className="ai-icon">
-              ⚕
-            </div>
-
-            <h2>
-              HealthAI Doctor Portal
-            </h2>
+            <h2>HealthAI Doctor Portal</h2>
 
             <p>
               Your healthcare management workspace.
@@ -318,15 +290,11 @@ function DoctorDashboard() {
               <span></span>
               Portal Active
             </div>
-
           </div>
-
         </section>
-
 
         {/* Appointment Statistics */}
         <section className="doctor-appointment-stats">
-
           <div className="doctor-stat-card">
             <h2>{appointments.length}</h2>
             <p>Total Requests</p>
@@ -351,22 +319,16 @@ function DoctorDashboard() {
             <h2>{completedCount}</h2>
             <p>Completed</p>
           </div>
-
         </section>
-
 
         {/* Patient Appointment Requests */}
         <section
           className="doctor-requests-section"
           id="patient-appointments"
         >
-
           <div className="doctor-section-heading">
-
             <div>
-              <h2>
-                Patient Appointment Requests
-              </h2>
+              <h2>Patient Appointment Requests</h2>
 
               <p>
                 View and manage requests sent by patients.
@@ -381,9 +343,7 @@ function DoctorDashboard() {
             >
               {refreshing ? "Refreshing..." : "↻ Refresh"}
             </button>
-
           </div>
-
 
           {error && (
             <div className="doctor-error" role="alert">
@@ -391,40 +351,26 @@ function DoctorDashboard() {
             </div>
           )}
 
-
           {appointments.length === 0 ? (
-
             <div className="doctor-no-appointments">
+              <div className="empty-icon">📅</div>
 
-              <div className="empty-icon">
-                📅
-              </div>
-
-              <h3>
-                No Appointment Requests Yet
-              </h3>
+              <h3>No Appointment Requests Yet</h3>
 
               <p>
                 When a patient books an appointment with you,
                 their request will appear here.
               </p>
-
             </div>
-
           ) : (
-
             <div className="doctor-appointment-list">
-
               {appointments.map((appointment) => (
-
                 <article
                   className="doctor-appointment-card"
                   key={appointment._id}
                 >
-
                   {/* Patient Information */}
                   <div className="doctor-appointment-header">
-
                     <div>
                       <h3>
                         {appointment.patient?.name ||
@@ -442,13 +388,10 @@ function DoctorDashboard() {
                     >
                       {appointment.status}
                     </span>
-
                   </div>
-
 
                   {/* Appointment Details */}
                   <div className="doctor-appointment-details">
-
                     <p>
                       <strong>Appointment Date:</strong>{" "}
                       {formatDate(appointment.appointmentDate)}
@@ -463,15 +406,11 @@ function DoctorDashboard() {
                       <strong>Request Submitted:</strong>{" "}
                       {formatDate(appointment.createdAt, false)}
                     </p>
-
                   </div>
-
 
                   {/* Pending Appointment Actions */}
                   {appointment.status === "pending" && (
-
                     <div className="doctor-action-buttons">
-
                       <button
                         type="button"
                         className="doctor-accept-btn"
@@ -488,7 +427,6 @@ function DoctorDashboard() {
                           : "Accept Request"}
                       </button>
 
-
                       <button
                         type="button"
                         className="doctor-reject-btn"
@@ -504,15 +442,11 @@ function DoctorDashboard() {
                           ? "Updating..."
                           : "Reject Request"}
                       </button>
-
                     </div>
-
                   )}
-
 
                   {/* Accepted Appointment Action */}
                   {appointment.status === "accepted" && (
-
                     <button
                       type="button"
                       className="doctor-complete-btn"
@@ -528,38 +462,26 @@ function DoctorDashboard() {
                         ? "Updating..."
                         : "Mark as Completed"}
                     </button>
-
                   )}
-
                 </article>
-
               ))}
-
             </div>
-
           )}
-
         </section>
-
 
         {/* Doctor Services */}
         <section className="quick-section">
-
           <div className="section-heading">
             <h2>Doctor Services</h2>
             <p>Manage your activities</p>
           </div>
 
-
           <div className="cards">
-
             <a
               href="#patient-appointments"
               className="health-card"
             >
-              <div className="card-icon">
-                📅
-              </div>
+              <div className="card-icon">📅</div>
 
               <h3>Appointments</h3>
 
@@ -567,19 +489,14 @@ function DoctorDashboard() {
                 View and manage patient appointment requests.
               </p>
 
-              <span>
-                View Requests →
-              </span>
+              <span>View Requests →</span>
             </a>
-
 
             <Link
               to="/doctor/appointments"
               className="health-card"
             >
-              <div className="card-icon">
-                📋
-              </div>
+              <div className="card-icon">📋</div>
 
               <h3>All Appointments</h3>
 
@@ -587,46 +504,30 @@ function DoctorDashboard() {
                 Open the dedicated appointment management page.
               </p>
 
-              <span>
-                View All →
-              </span>
+              <span>View All →</span>
             </Link>
-
           </div>
-
         </section>
-
 
         {/* Bottom Section */}
         <section className="bottom-section">
-
           <div className="activity-card">
-
             <div className="card-heading">
               <h2>Patient Activity</h2>
             </div>
 
             <div className="activity">
-
-              <div className="activity-icon">
-                📋
-              </div>
+              <div className="activity-icon">📋</div>
 
               <div>
                 <h4>Appointment Management</h4>
                 <p>Check your appointment requests.</p>
               </div>
-
             </div>
-
           </div>
 
-
           <div className="tip-card">
-
-            <div className="tip-icon">
-              💡
-            </div>
+            <div className="tip-icon">💡</div>
 
             <h2>Healthcare Reminder</h2>
 
@@ -634,9 +535,7 @@ function DoctorDashboard() {
               Review patient information carefully and
               maintain appropriate patient confidentiality.
             </p>
-
           </div>
-
         </section>
 
       </main>
