@@ -4,23 +4,32 @@ const Appointment = require("../models/Appointment");
 const User = require("../models/User");
 const Doctor = require("../models/Doctor");
 
+// Get authenticated user ID consistently
+const getUserId = (req) => req.user?.id || req.user?._id;
+
 // =====================================
 // 1. USER SENDS APPOINTMENT REQUEST
 // =====================================
 
 const createAppointment = async (req, res) => {
   try {
+    const patientId = getUserId(req);
     const { doctorId, appointmentDate, reason } = req.body;
 
-    // Validate required fields
-    if (!doctorId || !appointmentDate || !reason?.trim()) {
-      return res.status(400).json({
+    if (!patientId || !mongoose.Types.ObjectId.isValid(patientId)) {
+      return res.status(401).json({
         success: false,
-        message: "Please provide all appointment details"
+        message: "Invalid patient authentication"
       });
     }
 
-    // Validate MongoDB Doctor ID
+    if (!doctorId || !appointmentDate || !reason?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide doctor, appointment date and reason"
+      });
+    }
+
     if (!mongoose.Types.ObjectId.isValid(doctorId)) {
       return res.status(400).json({
         success: false,
@@ -28,7 +37,7 @@ const createAppointment = async (req, res) => {
       });
     }
 
-    // Find doctor in Doctor collection
+    // doctorId received from frontend must be Doctor collection ID
     const doctor = await Doctor.findById(doctorId);
 
     if (!doctor || doctor.available === false) {
@@ -38,39 +47,41 @@ const createAppointment = async (req, res) => {
       });
     }
 
-    // Find linked doctor login account
+    // Get the doctor's linked User account
     const doctorUser = await User.findById(doctor.userId);
 
     if (!doctorUser || doctorUser.role !== "doctor") {
       return res.status(404).json({
         success: false,
-        message: "Doctor account not found"
+        message: "Doctor login account not found"
       });
     }
 
-    // Validate appointment date
     const date = new Date(appointmentDate);
 
     if (Number.isNaN(date.getTime()) || date <= new Date()) {
       return res.status(400).json({
         success: false,
-        message: "Please provide a valid future appointment date"
+        message: "Please select a valid future appointment date"
       });
     }
 
-    // Create appointment
     const appointment = await Appointment.create({
-      patient: req.user.id,
+      patient: patientId,
       doctor: doctorUser._id,
       appointmentDate: date,
       reason: reason.trim(),
       status: "pending"
     });
 
+    const populatedAppointment = await Appointment.findById(appointment._id)
+      .populate("patient", "name email")
+      .populate("doctor", "name email");
+
     return res.status(201).json({
       success: true,
       message: "Appointment request sent successfully",
-      appointment
+      appointment: populatedAppointment
     });
 
   } catch (error) {
@@ -86,15 +97,34 @@ const createAppointment = async (req, res) => {
 
 
 // =====================================
-// 2. DOCTOR SEES INCOMING REQUESTS
+// 2. DOCTOR SEES INCOMING APPOINTMENTS
 // =====================================
 
 const getDoctorAppointments = async (req, res) => {
   try {
+    const doctorId = getUserId(req);
+
+    if (!doctorId || !mongoose.Types.ObjectId.isValid(doctorId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid doctor authentication"
+      });
+    }
+
+    const doctorUser = await User.findById(doctorId);
+
+    if (!doctorUser || doctorUser.role !== "doctor") {
+      return res.status(403).json({
+        success: false,
+        message: "Only doctors can view these appointments"
+      });
+    }
+
     const appointments = await Appointment.find({
-      doctor: req.user.id
+      doctor: doctorUser._id
     })
       .populate("patient", "name email")
+      .populate("doctor", "name email")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -121,7 +151,15 @@ const getDoctorAppointments = async (req, res) => {
 
 const updateAppointmentStatus = async (req, res) => {
   try {
+    const doctorId = getUserId(req);
     const { status } = req.body;
+
+    if (!doctorId || !mongoose.Types.ObjectId.isValid(doctorId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid doctor authentication"
+      });
+    }
 
     if (!["accepted", "rejected", "completed"].includes(status)) {
       return res.status(400).json({
@@ -137,10 +175,18 @@ const updateAppointmentStatus = async (req, res) => {
       });
     }
 
-    // Find appointment belonging to logged-in doctor
+    const doctorUser = await User.findById(doctorId);
+
+    if (!doctorUser || doctorUser.role !== "doctor") {
+      return res.status(403).json({
+        success: false,
+        message: "Only doctors can update appointments"
+      });
+    }
+
     const appointment = await Appointment.findOne({
       _id: req.params.id,
-      doctor: req.user.id
+      doctor: doctorUser._id
     });
 
     if (!appointment) {
@@ -150,7 +196,6 @@ const updateAppointmentStatus = async (req, res) => {
       });
     }
 
-    // Only accepted appointments can be completed
     if (
       status === "completed" &&
       appointment.status !== "accepted"
@@ -161,7 +206,6 @@ const updateAppointmentStatus = async (req, res) => {
       });
     }
 
-    // Only pending appointments can be accepted or rejected
     if (
       ["accepted", "rejected"].includes(status) &&
       appointment.status !== "pending"
@@ -199,10 +243,20 @@ const updateAppointmentStatus = async (req, res) => {
 
 const getUserAppointments = async (req, res) => {
   try {
+    const patientId = getUserId(req);
+
+    if (!patientId || !mongoose.Types.ObjectId.isValid(patientId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid patient authentication"
+      });
+    }
+
     const appointments = await Appointment.find({
-      patient: req.user.id
+      patient: patientId
     })
       .populate("doctor", "name email")
+      .populate("patient", "name email")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -224,11 +278,20 @@ const getUserAppointments = async (req, res) => {
 
 
 // =====================================
-// 5. USER CANCELS PENDING REQUEST
+// 5. USER CANCELS PENDING APPOINTMENT
 // =====================================
 
 const cancelAppointment = async (req, res) => {
   try {
+    const patientId = getUserId(req);
+
+    if (!patientId || !mongoose.Types.ObjectId.isValid(patientId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid patient authentication"
+      });
+    }
+
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({
         success: false,
@@ -238,7 +301,7 @@ const cancelAppointment = async (req, res) => {
 
     const appointment = await Appointment.findOne({
       _id: req.params.id,
-      patient: req.user.id
+      patient: patientId
     });
 
     if (!appointment) {
@@ -275,7 +338,7 @@ const cancelAppointment = async (req, res) => {
 
 
 // =====================================
-// EXPORT ALL FUNCTIONS
+// EXPORT
 // =====================================
 
 module.exports = {

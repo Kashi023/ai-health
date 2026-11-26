@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -6,9 +7,12 @@ const Doctor = require("../models/Doctor");
 
 // ==========================================
 // REGISTER DOCTOR
+// POST /api/doctors/register
 // ==========================================
 
 const registerDoctor = async (req, res) => {
+  let createdUser = null;
+
   try {
     const {
       name,
@@ -22,14 +26,14 @@ const registerDoctor = async (req, res) => {
       bio,
     } = req.body;
 
-    // Validate required fields
+    // 1. Validate required fields
     if (
-      !name ||
-      !email ||
-      !password ||
-      !specialization ||
+      typeof name !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      typeof specialization !== "string" ||
+      typeof qualification !== "string" ||
       experience === undefined ||
-      !qualification ||
       consultationFee === undefined
     ) {
       return res.status(400).json({
@@ -38,6 +42,35 @@ const registerDoctor = async (req, res) => {
       });
     }
 
+    // 2. Normalize inputs
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedSpecialization = specialization.trim();
+    const normalizedQualification = qualification.trim();
+
+    if (
+      !normalizedName ||
+      !normalizedEmail ||
+      !normalizedSpecialization ||
+      !normalizedQualification
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Required fields cannot be empty.",
+      });
+    }
+
+    // 3. Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
+    }
+
+    // 4. Validate password
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
@@ -45,11 +78,15 @@ const registerDoctor = async (req, res) => {
       });
     }
 
+    // 5. Validate experience and consultation fee
+    const parsedExperience = Number(experience);
+    const parsedFee = Number(consultationFee);
+
     if (
-      !Number.isFinite(Number(experience)) ||
-      Number(experience) < 0 ||
-      !Number.isFinite(Number(consultationFee)) ||
-      Number(consultationFee) < 0
+      !Number.isFinite(parsedExperience) ||
+      parsedExperience < 0 ||
+      !Number.isFinite(parsedFee) ||
+      parsedFee < 0
     ) {
       return res.status(400).json({
         success: false,
@@ -57,9 +94,7 @@ const registerDoctor = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    // Check existing account
+    // 6. Check existing account
     const existingUser = await User.findOne({
       email: normalizedEmail,
     });
@@ -71,42 +106,62 @@ const registerDoctor = async (req, res) => {
       });
     }
 
-    // Hash password
+    // 7. Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create doctor login account
-    const user = await User.create({
-      name: name.trim(),
+    // 8. Create doctor login account
+    createdUser = await User.create({
+      name: normalizedName,
       email: normalizedEmail,
       password: hashedPassword,
       role: "doctor",
     });
 
-    try {
-      // Create professional doctor profile
-      const doctor = await Doctor.create({
-        userId: user._id,
-        name: name.trim(),
-        specialization: specialization.trim(),
-        experience: Number(experience),
-        qualification: qualification.trim(),
-        hospital: hospital || "",
-        consultationFee: Number(consultationFee),
-        bio: bio || "",
-      });
+    // 9. Create doctor professional profile
+    const doctor = await Doctor.create({
+      userId: createdUser._id,
+      name: normalizedName,
+      specialization: normalizedSpecialization,
+      experience: parsedExperience,
+      qualification: normalizedQualification,
+      hospital: typeof hospital === "string" ? hospital.trim() : "",
+      consultationFee: parsedFee,
+      bio: typeof bio === "string" ? bio.trim() : "",
+      available: true,
+    });
 
-      return res.status(201).json({
-        success: true,
-        message: "Doctor registered successfully.",
-        doctor,
-      });
-    } catch (error) {
-      // Avoid leaving an orphaned User if profile creation fails
-      await User.findByIdAndDelete(user._id);
-      throw error;
-    }
+    // 10. Return successful response
+    return res.status(201).json({
+      success: true,
+      message: "Doctor registered successfully.",
+      doctor,
+    });
+
   } catch (error) {
     console.error("Doctor registration error:", error);
+
+    // Remove User account if Doctor profile creation failed
+    if (createdUser?._id) {
+      try {
+        await User.findByIdAndDelete(createdUser._id);
+      } catch (cleanupError) {
+        console.error("Doctor registration cleanup error:", cleanupError);
+      }
+    }
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email already exists.",
+      });
+    }
+
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
 
     return res.status(500).json({
       success: false,
@@ -116,13 +171,17 @@ const registerDoctor = async (req, res) => {
   }
 };
 
+
 // ==========================================
 // GET ALL DOCTORS
+// GET /api/doctors
 // ==========================================
 
 const getAllDoctors = async (req, res) => {
   try {
-    const doctors = await Doctor.find()
+    const doctors = await Doctor.find({
+      available: { $ne: false },
+    })
       .populate("userId", "name email role profileImage")
       .sort({ createdAt: -1 });
 
@@ -131,43 +190,52 @@ const getAllDoctors = async (req, res) => {
       count: doctors.length,
       doctors,
     });
+
   } catch (error) {
     console.error("Get all doctors error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Unable to fetch doctors.",
+      error: error.message,
     });
   }
 };
 
+
 // ==========================================
 // GET LOGGED-IN DOCTOR PROFILE
+// GET /api/doctors/profile
 // ==========================================
 
 const getDoctorProfile = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id || req.user?._id;
 
-    // Find profile using the logged-in doctor's User ID
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid doctor authentication.",
+      });
+    }
+
+    const user = await User.findById(userId).select(
+      "name email role profileImage"
+    );
+
+    if (!user || user.role !== "doctor") {
+      return res.status(403).json({
+        success: false,
+        message: "Doctor account not found.",
+      });
+    }
+
     let doctor = await Doctor.findOne({
-      userId: userId,
+      userId: user._id,
     }).populate("userId", "name email role profileImage");
 
-    // If profile is missing, check whether the User account exists
+    // Create a basic profile only if it is missing
     if (!doctor) {
-      const user = await User.findById(userId).select(
-        "name email role profileImage"
-      );
-
-      if (!user || user.role !== "doctor") {
-        return res.status(404).json({
-          success: false,
-          message: "Doctor account not found.",
-        });
-      }
-
-      // Create a basic profile for an existing doctor account
       doctor = await Doctor.create({
         userId: user._id,
         name: user.name,
@@ -175,6 +243,7 @@ const getDoctorProfile = async (req, res) => {
         experience: 0,
         qualification: "Not specified",
         consultationFee: 0,
+        available: true,
       });
 
       doctor = await Doctor.findById(doctor._id).populate(
@@ -198,6 +267,7 @@ const getDoctorProfile = async (req, res) => {
     });
   }
 };
+
 
 // ==========================================
 // EXPORT FUNCTIONS

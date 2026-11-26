@@ -11,26 +11,22 @@ const registerUser = async (req, res) => {
   try {
     const { name, email, password, age, gender } = req.body;
 
-    // Validate required fields
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide name, email and password"
-      });
-    }
-
-    // Validate input types
+    // 1. Validate required fields
     if (
+      !name ||
+      !email ||
+      !password ||
       typeof name !== "string" ||
       typeof email !== "string" ||
       typeof password !== "string"
     ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid input data"
+        message: "Please provide valid name, email and password"
       });
     }
 
+    // 2. Normalize inputs
     const normalizedName = name.trim();
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -41,7 +37,7 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Validate email format
+    // 3. Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailRegex.test(normalizedEmail)) {
@@ -51,15 +47,49 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Validate password
-    if (password.length < 6) {
+    // 4. Validate password
+    if (password.trim().length < 6) {
       return res.status(400).json({
         success: false,
         message: "Password must contain at least 6 characters"
       });
     }
 
-    // Check existing account
+    // 5. Validate age if provided
+    let parsedAge;
+
+    if (age !== undefined && age !== "") {
+      parsedAge = Number(age);
+
+      if (
+        !Number.isInteger(parsedAge) ||
+        parsedAge < 1 ||
+        parsedAge > 120
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid age between 1 and 120"
+        });
+      }
+    }
+
+    // 6. Validate gender if provided
+    const allowedGenders = ["male", "female", "other"];
+
+    let normalizedGender;
+
+    if (gender !== undefined && gender !== "") {
+      normalizedGender = String(gender).trim().toLowerCase();
+
+      if (!allowedGenders.includes(normalizedGender)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please select a valid gender"
+        });
+      }
+    }
+
+    // 7. Check existing account
     const existingUser = await User.findOne({
       email: normalizedEmail
     });
@@ -71,19 +101,20 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Hash password
+    // 8. Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create patient account
+    // 9. Create patient account
     const newUser = await User.create({
       name: normalizedName,
       email: normalizedEmail,
       password: hashedPassword,
-      age: age !== undefined && age !== "" ? Number(age) : undefined,
-      gender: gender || undefined,
+      ...(parsedAge !== undefined && { age: parsedAge }),
+      ...(normalizedGender && { gender: normalizedGender }),
       role: "user"
     });
 
+    // 10. Send response without password
     return res.status(201).json({
       success: true,
       message: "Patient registration successful",
@@ -102,6 +133,13 @@ const registerUser = async (req, res) => {
       return res.status(409).json({
         success: false,
         message: "Email already registered"
+      });
+    }
+
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: error.message
       });
     }
 
