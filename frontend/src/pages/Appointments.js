@@ -20,11 +20,9 @@ const Appointments = () => {
   const [error, setError] = useState("");
 
   const token = localStorage.getItem("token");
-  const role = (localStorage.getItem("role") || "")
-    .trim()
-    .toLowerCase();
+  const role = (localStorage.getItem("role") || "").trim().toLowerCase();
 
-  // Get all registered doctors
+  // Fetch all registered doctors
   const fetchDoctors = useCallback(async () => {
     try {
       const response = await axios.get(
@@ -61,7 +59,7 @@ const Appointments = () => {
     }
   }, [token]);
 
-  // Get logged-in user's appointments
+  // Fetch logged-in user's appointments
   const fetchAppointments = useCallback(async () => {
     try {
       const response = await axios.get(
@@ -185,15 +183,13 @@ const Appointments = () => {
     }
   };
 
-  // Cancel pending appointment
+  // Cancel appointment
   const handleCancel = async (id) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to cancel this appointment?"
-      )
-    ) {
-      return;
-    }
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this appointment?"
+    );
+
+    if (!confirmed) return;
 
     try {
       await axios.delete(
@@ -232,6 +228,7 @@ const Appointments = () => {
     });
   };
 
+  // Loading screen
   if (loading) {
     return (
       <>
@@ -290,8 +287,7 @@ const Appointments = () => {
                     <h3>{doctor.name || "Doctor"}</h3>
 
                     <p>
-                      <strong>Doctor ID:</strong>{" "}
-                      {doctor._id}
+                      <strong>Doctor ID:</strong> {doctor._id}
                     </p>
 
                     <p>
@@ -330,8 +326,7 @@ const Appointments = () => {
               </p>
 
               <p>
-                Doctor ID:{" "}
-                <strong>{selectedDoctor._id}</strong>
+                Doctor ID: <strong>{selectedDoctor._id}</strong>
               </p>
 
               <form onSubmit={handleBooking}>
@@ -359,9 +354,7 @@ const Appointments = () => {
                 <textarea
                   placeholder="Describe your reason for booking..."
                   value={reason}
-                  onChange={(e) =>
-                    setReason(e.target.value)
-                  }
+                  onChange={(e) => setReason(e.target.value)}
                   rows="4"
                   required
                 />
@@ -445,9 +438,7 @@ const Appointments = () => {
                     <button
                       className="cancel-appointment-btn"
                       type="button"
-                      onClick={() =>
-                        handleCancel(appointment._id)
-                      }
+                      onClick={() => handleCancel(appointment._id)}
                     >
                       Cancel Request
                     </button>
