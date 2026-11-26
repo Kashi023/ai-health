@@ -6,6 +6,10 @@ const FormData = require("form-data");
 
 const router = express.Router();
 
+// Deployed Python ML service URL
+const ML_URL = process.env.ML_SERVICE_URL;
+
+// Image upload configuration
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -26,6 +30,7 @@ const upload = multer({
   },
 });
 
+// POST /api/analysis/image
 router.post("/", (req, res) => {
   upload.single("image")(req, res, async (err) => {
     if (err) {
@@ -43,6 +48,19 @@ router.post("/", (req, res) => {
     }
 
     try {
+      // Check ML service configuration
+      if (!ML_URL) {
+        console.error("ML_SERVICE_URL is not configured");
+
+        return res.status(500).json({
+          success: false,
+          message: "ML service URL is not configured on the server.",
+        });
+      }
+
+      console.log("Sending image to deployed Python ML service");
+
+      // Prepare multipart form data
       const form = new FormData();
 
       form.append("image", req.file.buffer, {
@@ -50,8 +68,9 @@ router.post("/", (req, res) => {
         contentType: req.file.mimetype,
       });
 
+      // Call deployed Flask image prediction endpoint
       const response = await axios.post(
-        "http://127.0.0.1:5001/predict-image",
+        `${ML_URL.replace(/\/$/, "")}/predict-image`,
         form,
         {
           headers: form.getHeaders(),
@@ -66,9 +85,11 @@ router.post("/", (req, res) => {
         success: true,
         ...response.data,
       });
+
     } catch (error) {
       console.error(
         "Image ML service error:",
+        error.response?.status || "No HTTP status",
         error.response?.data || error.message
       );
 
@@ -78,7 +99,7 @@ router.post("/", (req, res) => {
         success: false,
         message:
           error.response?.data?.message ||
-          "Image analysis failed. Check that the Flask service and image model are running.",
+          "Image analysis failed. Please check the Python ML service.",
       });
     }
   });
