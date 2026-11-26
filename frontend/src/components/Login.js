@@ -3,10 +3,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import "./Login.css";
-
-const API_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
-).replace(/\/$/, "");
+import API_URL from "../config";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -64,7 +61,7 @@ const Login = () => {
           : "/api/auth/login";
 
       const response = await axios.post(
-        `${API_URL}${endpoint}`,
+        `${API_URL.replace(/\/$/, "")}${endpoint}`,
         {
           email,
           password
@@ -73,7 +70,7 @@ const Login = () => {
           headers: {
             "Content-Type": "application/json"
           },
-          timeout: 15000
+          timeout: 30000
         }
       );
 
@@ -137,7 +134,7 @@ const Login = () => {
         );
       } else if (err.request) {
         setError(
-          "Cannot connect to the server. Please check whether your backend is running."
+          "Cannot connect to the server. Please check your backend deployment."
         );
       } else {
         setError(err.message || "Something went wrong.");
