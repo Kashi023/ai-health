@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Navbar from "../components/Navbar";
 import "./Appointments.css";
@@ -24,21 +24,15 @@ const Appointments = () => {
     .trim()
     .toLowerCase();
 
-  // Memoize authorization headers
-  const authHeaders = useMemo(
-    () => ({
-      Authorization: `Bearer ${token}`,
-    }),
-    [token]
-  );
-
   // Get all registered doctors
   const fetchDoctors = useCallback(async () => {
     try {
       const response = await axios.get(
         `${BASE_URL}/api/doctors`,
         {
-          headers: authHeaders,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           timeout: 30000,
         }
       );
@@ -65,7 +59,7 @@ const Appointments = () => {
           "Unable to load doctors. Please try again."
       );
     }
-  }, [authHeaders]);
+  }, [token]);
 
   // Get logged-in user's appointments
   const fetchAppointments = useCallback(async () => {
@@ -73,7 +67,9 @@ const Appointments = () => {
       const response = await axios.get(
         `${BASE_URL}/api/appointments/my`,
         {
-          headers: authHeaders,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           timeout: 30000,
         }
       );
@@ -100,7 +96,7 @@ const Appointments = () => {
           "Unable to load your appointments."
       );
     }
-  }, [authHeaders]);
+  }, [token]);
 
   // Load doctors and appointments
   useEffect(() => {
@@ -160,7 +156,7 @@ const Appointments = () => {
         },
         {
           headers: {
-            ...authHeaders,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           timeout: 30000,
@@ -203,7 +199,9 @@ const Appointments = () => {
       await axios.delete(
         `${BASE_URL}/api/appointments/${id}`,
         {
-          headers: authHeaders,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           timeout: 30000,
         }
       );
