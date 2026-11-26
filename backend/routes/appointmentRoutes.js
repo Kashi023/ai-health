@@ -7,7 +7,7 @@ const router = express.Router();
 // Authentication and authorization middleware
 const {
   protect,
-  authorizeRole
+  authorizeRole,
 } = require("../middleware/authMiddleware");
 
 // Appointment controller functions
@@ -16,33 +16,28 @@ const {
   getDoctorAppointments,
   updateAppointmentStatus,
   getUserAppointments,
-  cancelAppointment
+  cancelAppointment,
 } = require("../controllers/appointmentController");
 
-
-// ==========================================
-// VALIDATE APPOINTMENT ID
-// ==========================================
-
+// Validate appointment ID
 const validateAppointmentId = (req, res, next) => {
   const { id } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({
       success: false,
-      message: "Invalid appointment ID"
+      message: "Invalid appointment ID",
     });
   }
 
   next();
 };
 
-
 // ==========================================
 // PATIENT ROUTES
 // ==========================================
 
-// Create appointment request
+// Create a new appointment
 router.post(
   "/",
   protect,
@@ -58,7 +53,7 @@ router.get(
   getUserAppointments
 );
 
-// Cancel pending appointment
+// Cancel a pending appointment
 router.delete(
   "/:id",
   protect,
@@ -66,7 +61,6 @@ router.delete(
   validateAppointmentId,
   cancelAppointment
 );
-
 
 // ==========================================
 // DOCTOR ROUTES
@@ -80,7 +74,7 @@ router.get(
   getDoctorAppointments
 );
 
-// Accept, reject or complete appointment
+// Accept, reject, or complete an appointment
 router.patch(
   "/:id/status",
   protect,
@@ -88,10 +82,5 @@ router.patch(
   validateAppointmentId,
   updateAppointmentStatus
 );
-
-
-// ==========================================
-// EXPORT ROUTER
-// ==========================================
 
 module.exports = router;
