@@ -4,9 +4,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import Navbar from "../components/Navbar";
 import "./Doctors.css";
-
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+import API_URL from "../config";
 
 function Doctors() {
   const [search, setSearch] = useState("");
@@ -20,10 +18,9 @@ function Doctors() {
     localStorage.getItem("role") || ""
   ).trim().toLowerCase();
 
-  // ==========================================
-  // FETCH REGISTERED DOCTORS
-  // ==========================================
+  const BASE_URL = API_URL.replace(/\/$/, "");
 
+  // Fetch registered doctors
   useEffect(() => {
     let isMounted = true;
 
@@ -32,9 +29,11 @@ function Doctors() {
         setLoading(true);
         setError("");
 
-        // Public doctor listing endpoint
         const response = await axios.get(
-          `${API_URL}/api/doctors`
+          `${BASE_URL}/api/doctors`,
+          {
+            timeout: 30000
+          }
         );
 
         const doctorList =
@@ -43,13 +42,14 @@ function Doctors() {
           response.data;
 
         if (!Array.isArray(doctorList)) {
-          throw new Error("Invalid doctor data received from server.");
+          throw new Error(
+            "Invalid doctor data received from server."
+          );
         }
 
         if (isMounted) {
           setDoctors(doctorList);
         }
-
       } catch (err) {
         console.error(
           "Error fetching doctors:",
@@ -63,7 +63,6 @@ function Doctors() {
             "Unable to load registered doctors."
           );
         }
-
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -76,14 +75,9 @@ function Doctors() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [BASE_URL]);
 
-
-  // ==========================================
-  // GET DOCTOR INFORMATION
-  // Supports populated and unpopulated userId
-  // ==========================================
-
+  // Get doctor information
   const getDoctorInfo = (doctor) => {
     const linkedUser =
       doctor.userId && typeof doctor.userId === "object"
@@ -93,9 +87,11 @@ function Doctors() {
     return {
       name: doctor.name || linkedUser.name || "Doctor",
       email: doctor.email || linkedUser.email || "",
-      specialization: doctor.specialization || "Not provided",
+      specialization:
+        doctor.specialization || "Not provided",
       experience: doctor.experience ?? null,
-      qualification: doctor.qualification || "Not provided",
+      qualification:
+        doctor.qualification || "Not provided",
       hospital: doctor.hospital || "Not provided",
       consultationFee: doctor.consultationFee ?? null,
       rating: doctor.rating ?? 0,
@@ -106,11 +102,7 @@ function Doctors() {
     };
   };
 
-
-  // ==========================================
-  // SPECIALIZATION FILTER OPTIONS
-  // ==========================================
-
+  // Specialization filter options
   const specializations = useMemo(() => {
     const values = doctors
       .map((doctor) => doctor.specialization)
@@ -122,11 +114,7 @@ function Doctors() {
     ];
   }, [doctors]);
 
-
-  // ==========================================
-  // SEARCH AND FILTER DOCTORS
-  // ==========================================
-
+  // Search and filter doctors
   const filteredDoctors = useMemo(() => {
     const searchText = search.trim().toLowerCase();
 
@@ -148,11 +136,7 @@ function Doctors() {
     });
   }, [doctors, search, specialization]);
 
-
-  // ==========================================
-  // VIEW DOCTOR PROFILE
-  // ==========================================
-
+  // View doctor profile
   const viewProfile = (doctor) => {
     const info = getDoctorInfo(doctor);
 
@@ -175,11 +159,6 @@ function Doctors() {
     );
   };
 
-
-  // ==========================================
-  // UI
-  // ==========================================
-
   return (
     <>
       <Navbar />
@@ -188,7 +167,6 @@ function Doctors() {
 
         {/* Page Header */}
         <section className="doctors-header">
-
           <p className="doctors-label">
             HEALTHCARE PROFESSIONALS
           </p>
@@ -201,9 +179,7 @@ function Doctors() {
             Connect with registered healthcare professionals
             based on your health needs.
           </p>
-
         </section>
-
 
         {/* Search and Specialization Filter */}
         <section className="doctor-search">
@@ -219,7 +195,6 @@ function Doctors() {
             />
           </div>
 
-
           <select
             value={specialization}
             onChange={(e) => setSpecialization(e.target.value)}
@@ -233,18 +208,14 @@ function Doctors() {
 
         </section>
 
-
         {/* Doctor Count */}
         <div className="doctor-count">
-
           <span>
             {loading
               ? "Loading doctors..."
               : `${filteredDoctors.length} doctors found`}
           </span>
-
         </div>
-
 
         {/* Doctor Listing */}
         <section className="doctor-grid">
@@ -277,7 +248,6 @@ function Doctors() {
                   <div className="doctor-top">
 
                     <div className="doctor-avatar">
-
                       {info.profileImage ? (
                         <img
                           src={info.profileImage}
@@ -286,7 +256,6 @@ function Doctors() {
                       ) : (
                         "👨‍⚕️"
                       )}
-
                     </div>
 
                     <div className="doctor-status">
@@ -298,16 +267,12 @@ function Doctors() {
 
                   </div>
 
-
                   {/* Doctor Information */}
-                  <h2>
-                    Dr. {info.name}
-                  </h2>
+                  <h2>Dr. {info.name}</h2>
 
                   <p className="specialization">
                     {info.specialization}
                   </p>
-
 
                   {/* Doctor Details */}
                   <div className="doctor-details">
@@ -354,7 +319,6 @@ function Doctors() {
 
                   </div>
 
-
                   {/* Doctor Buttons */}
                   <div className="doctor-buttons">
 
@@ -365,7 +329,6 @@ function Doctors() {
                     >
                       View Profile
                     </button>
-
 
                     {role === "doctor" ? (
 
@@ -425,7 +388,6 @@ function Doctors() {
           )}
 
         </section>
-
 
         {/* Disclaimer */}
         <section className="doctor-disclaimer">
