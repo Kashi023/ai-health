@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Navbar from "../components/Navbar";
 import "./Appointments.css";
+import API_URL from "../config";
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE_URL = API_URL.replace(/\/$/, "");
 
 const Appointments = () => {
   const [doctors, setDoctors] = useState([]);
@@ -25,11 +26,12 @@ const Appointments = () => {
   const fetchDoctors = useCallback(async () => {
     try {
       const response = await axios.get(
-        `${API_URL}/api/doctors`,
+        `${BASE_URL}/api/doctors`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          timeout: 30000,
         }
       );
 
@@ -54,11 +56,12 @@ const Appointments = () => {
   const fetchAppointments = useCallback(async () => {
     try {
       const response = await axios.get(
-        `${API_URL}/api/appointments/my`,
+        `${BASE_URL}/api/appointments/my`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          timeout: 30000,
         }
       );
 
@@ -111,7 +114,7 @@ const Appointments = () => {
       setBooking(true);
 
       await axios.post(
-        `${API_URL}/api/appointments`,
+        `${BASE_URL}/api/appointments`,
         {
           doctorId: selectedDoctor._id,
           appointmentDate,
@@ -120,7 +123,9 @@ const Appointments = () => {
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
+          timeout: 30000,
         }
       );
 
@@ -155,11 +160,12 @@ const Appointments = () => {
 
     try {
       await axios.delete(
-        `${API_URL}/api/appointments/${id}`,
+        `${BASE_URL}/api/appointments/${id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          timeout: 30000,
         }
       );
 
@@ -231,7 +237,7 @@ const Appointments = () => {
                     {doctor.profileImage ? (
                       <img
                         src={doctor.profileImage}
-                        alt={doctor.name}
+                        alt={doctor.name || "Doctor"}
                       />
                     ) : (
                       <span>
