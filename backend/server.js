@@ -45,6 +45,13 @@ app.use("/api/symptoms", symptomRoutes);
 app.use("/api/analysis/image", imageAnalysisRoutes);
 // Server
 const PORT = process.env.PORT || 5000;
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "https://ai-health-p8fh-tau.vercel.app"
+  ],
+  credentials: true
+}));
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
