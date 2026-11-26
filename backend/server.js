@@ -15,16 +15,27 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://ai-health-p8fh-coic6a1fj-kashish23.vercel.app"
+  "https://ai-health-p8fh.vercel.app"
 ];
 
 app.use(
   cors({
-    origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    origin: function (origin, callback) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        /^https:\/\/ai-health-p8fh-[a-z0-9-]+-kashish23\.vercel\.app$/.test(origin)
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
+
 
 // Middleware
 app.use(express.json());
