@@ -1,5 +1,6 @@
 
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 
 // ==========================================
 // AUTHENTICATION MIDDLEWARE
@@ -7,58 +8,52 @@ const jwt = require("jsonwebtoken");
 
 const protect = (req, res, next) => {
   try {
-    // Check JWT secret
     if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET is missing in environment variables");
+      console.error("JWT_SECRET is missing");
 
       return res.status(500).json({
         success: false,
-        message: "Server authentication configuration error"
+        message: "Server authentication configuration error",
       });
     }
 
-    // Get authorization header
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        message: "Authentication token required"
+        message: "Authentication token required",
       });
     }
 
-    // Extract token
-    const token = authHeader.split(" ")[1];
+    const token = authHeader.slice(7).trim();
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Invalid authorization header"
+        message: "Invalid authorization header",
       });
     }
 
-    // Verify JWT token
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET
-    );
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get user ID
     const userId = decoded.id || decoded._id || decoded.userId;
 
-    // Validate decoded information
-    if (!userId || !decoded.role) {
+    if (
+      !userId ||
+      !mongoose.Types.ObjectId.isValid(userId) ||
+      !decoded.role
+    ) {
       return res.status(401).json({
         success: false,
-        message: "Invalid token: User information missing"
+        message: "Invalid token: User information missing",
       });
     }
 
-    // Attach authenticated user to request
     req.user = {
       ...decoded,
       id: userId.toString(),
-      role: decoded.role
+      role: decoded.role,
     };
 
     next();
@@ -69,13 +64,13 @@ const protect = (req, res, next) => {
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
-        message: "Session expired. Please login again."
+        message: "Session expired. Please login again.",
       });
     }
 
     return res.status(401).json({
       success: false,
-      message: "Invalid or expired authentication token"
+      message: "Invalid or expired authentication token",
     });
   }
 };
@@ -87,20 +82,17 @@ const protect = (req, res, next) => {
 
 const authorizeRole = (...roles) => {
   return (req, res, next) => {
-
-    // Check authentication
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: "Please login first"
+        message: "Please login first",
       });
     }
 
-    // Check user role
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: "You are not authorized to access this resource"
+        message: "You are not authorized to access this resource",
       });
     }
 
@@ -110,10 +102,10 @@ const authorizeRole = (...roles) => {
 
 
 // ==========================================
-// EXPORT MIDDLEWARE
+// EXPORT
 // ==========================================
 
 module.exports = {
   protect,
-  authorizeRole
+  authorizeRole,
 };
