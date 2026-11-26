@@ -6,6 +6,8 @@ import Navbar from "../components/Navbar";
 import "./Doctors.css";
 import API_URL from "../config";
 
+const BASE_URL = API_URL.replace(/\/$/, "");
+
 function Doctors() {
   const [search, setSearch] = useState("");
   const [specialization, setSpecialization] = useState("All");
@@ -17,8 +19,6 @@ function Doctors() {
   const role = (
     localStorage.getItem("role") || ""
   ).trim().toLowerCase();
-
-  const BASE_URL = API_URL.replace(/\/$/, "");
 
   // Fetch registered doctors
   useEffect(() => {
@@ -32,14 +32,15 @@ function Doctors() {
         const response = await axios.get(
           `${BASE_URL}/api/doctors`,
           {
-            timeout: 30000
+            timeout: 30000,
           }
         );
 
-        const doctorList =
-          response.data.doctors ||
-          response.data.data ||
-          response.data;
+        const data = response.data;
+
+        const doctorList = Array.isArray(data)
+          ? data
+          : data?.doctors || data?.data || [];
 
         if (!Array.isArray(doctorList)) {
           throw new Error(
@@ -59,8 +60,8 @@ function Doctors() {
         if (isMounted) {
           setError(
             err.response?.data?.message ||
-            err.message ||
-            "Unable to load registered doctors."
+              err.message ||
+              "Unable to load registered doctors."
           );
         }
       } finally {
@@ -75,7 +76,7 @@ function Doctors() {
     return () => {
       isMounted = false;
     };
-  }, [BASE_URL]);
+  }, []);
 
   // Get doctor information
   const getDoctorInfo = (doctor) => {
@@ -98,7 +99,7 @@ function Doctors() {
       profileImage:
         doctor.profileImage ||
         linkedUser.profileImage ||
-        ""
+        "",
     };
   };
 
@@ -110,7 +111,7 @@ function Doctors() {
 
     return [
       "All",
-      ...Array.from(new Set(values)).sort()
+      ...Array.from(new Set(values)).sort(),
     ];
   }, [doctors]);
 
@@ -142,20 +143,20 @@ function Doctors() {
 
     alert(
       `Doctor: Dr. ${info.name}\n` +
-      `Specialization: ${info.specialization}\n` +
-      `Qualification: ${info.qualification}\n` +
-      `Experience: ${
-        info.experience !== null
-          ? `${info.experience} years`
-          : "Not provided"
-      }\n` +
-      `Hospital: ${info.hospital}\n` +
-      `Email: ${info.email || "Not available"}\n` +
-      `Consultation Fee: ${
-        info.consultationFee !== null
-          ? `₹${info.consultationFee}`
-          : "Not provided"
-      }`
+        `Specialization: ${info.specialization}\n` +
+        `Qualification: ${info.qualification}\n` +
+        `Experience: ${
+          info.experience !== null
+            ? `${info.experience} years`
+            : "Not provided"
+        }\n` +
+        `Hospital: ${info.hospital}\n` +
+        `Email: ${info.email || "Not available"}\n` +
+        `Consultation Fee: ${
+          info.consultationFee !== null
+            ? `₹${info.consultationFee}`
+            : "Not provided"
+        }`
     );
   };
 
@@ -164,7 +165,6 @@ function Doctors() {
       <Navbar />
 
       <main className="doctors-page">
-
         {/* Page Header */}
         <section className="doctors-header">
           <p className="doctors-label">
@@ -183,7 +183,6 @@ function Doctors() {
 
         {/* Search and Specialization Filter */}
         <section className="doctor-search">
-
           <div className="search-box">
             <span>🔍</span>
 
@@ -205,7 +204,6 @@ function Doctors() {
               </option>
             ))}
           </select>
-
         </section>
 
         {/* Doctor Count */}
@@ -219,22 +217,16 @@ function Doctors() {
 
         {/* Doctor Listing */}
         <section className="doctor-grid">
-
           {loading ? (
-
             <div className="no-doctors">
               <h2>Loading registered doctors...</h2>
             </div>
-
           ) : error ? (
-
             <div className="no-doctors">
               <h2>Unable to load doctors</h2>
               <p>{error}</p>
             </div>
-
           ) : filteredDoctors.length > 0 ? (
-
             filteredDoctors.map((doctor) => {
               const info = getDoctorInfo(doctor);
 
@@ -243,10 +235,8 @@ function Doctors() {
                   className="doctor-card"
                   key={doctor._id}
                 >
-
                   {/* Doctor Top */}
                   <div className="doctor-top">
-
                     <div className="doctor-avatar">
                       {info.profileImage ? (
                         <img
@@ -264,7 +254,6 @@ function Doctors() {
                         ? "Unavailable"
                         : "Registered"}
                     </div>
-
                   </div>
 
                   {/* Doctor Information */}
@@ -276,7 +265,6 @@ function Doctors() {
 
                   {/* Doctor Details */}
                   <div className="doctor-details">
-
                     <div>
                       <span>🎓</span>
                       <span>{info.qualification}</span>
@@ -316,12 +304,10 @@ function Doctors() {
                       <span>⭐</span>
                       <span>{info.rating} / 5 rating</span>
                     </div>
-
                   </div>
 
                   {/* Doctor Buttons */}
                   <div className="doctor-buttons">
-
                     <button
                       className="profile-btn"
                       type="button"
@@ -331,21 +317,18 @@ function Doctors() {
                     </button>
 
                     {role === "doctor" ? (
-
                       <Link
                         to="/doctor/appointments"
                         className="book-btn"
                       >
                         View Appointments
                       </Link>
-
                     ) : (
-
                       <Link
                         to="/appointments"
                         state={{
                           doctorId: doctor._id,
-                          doctorName: info.name
+                          doctorName: info.name,
                         }}
                         className="book-btn"
                         onClick={(e) => {
@@ -359,51 +342,35 @@ function Doctors() {
                       >
                         Book Appointment
                       </Link>
-
                     )}
-
                   </div>
-
                 </article>
               );
             })
-
           ) : (
-
             <div className="no-doctors">
-
               <div>🔍</div>
 
-              <h2>
-                No registered doctors found
-              </h2>
+              <h2>No registered doctors found</h2>
 
               <p>
                 No doctors currently match your search.
                 Try another name or specialization.
               </p>
-
             </div>
-
           )}
-
         </section>
 
         {/* Disclaimer */}
         <section className="doctor-disclaimer">
-
-          <strong>
-            ⚠ Important Notice
-          </strong>
+          <strong>⚠ Important Notice</strong>
 
           <p>
             Doctor details are fetched from registered accounts.
             Please verify credentials and appointment availability
             before booking.
           </p>
-
         </section>
-
       </main>
     </>
   );

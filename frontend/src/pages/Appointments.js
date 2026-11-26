@@ -20,7 +20,13 @@ const Appointments = () => {
   const [error, setError] = useState("");
 
   const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
+  const role = (
+    localStorage.getItem("role") || ""
+  ).trim().toLowerCase();
+
+  const authHeaders = {
+    Authorization: `Bearer ${token}`,
+  };
 
   // Get all registered doctors
   const fetchDoctors = useCallback(async () => {
@@ -28,57 +34,74 @@ const Appointments = () => {
       const response = await axios.get(
         `${BASE_URL}/api/doctors`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: authHeaders,
           timeout: 30000,
         }
       );
 
       const data = response.data;
 
-      setDoctors(
-        Array.isArray(data)
-          ? data
-          : data.doctors || data.data || []
+      const doctorList = Array.isArray(data)
+        ? data
+        : data?.doctors || data?.data || [];
+
+      if (!Array.isArray(doctorList)) {
+        throw new Error("Invalid doctor data received.");
+      }
+
+      setDoctors(doctorList);
+    } catch (err) {
+      console.error(
+        "Doctor fetching error:",
+        err.response?.data || err.message
       );
-    } catch (error) {
-      console.error("Doctor fetching error:", error);
 
       setError(
-        error.response?.data?.message ||
-          "Unable to load doctors. Please check the doctor API."
+        err.response?.data?.message ||
+          "Unable to load doctors. Please try again."
       );
     }
   }, [token]);
 
-  // Get user's appointments
+  // Get logged-in user's appointments
   const fetchAppointments = useCallback(async () => {
     try {
       const response = await axios.get(
         `${BASE_URL}/api/appointments/my`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: authHeaders,
           timeout: 30000,
         }
       );
 
       const data = response.data;
 
-      setAppointments(
-        Array.isArray(data)
-          ? data
-          : data.appointments || data.data || []
+      const appointmentList = Array.isArray(data)
+        ? data
+        : data?.appointments || data?.data || [];
+
+      if (!Array.isArray(appointmentList)) {
+        throw new Error("Invalid appointment data received.");
+      }
+
+      setAppointments(appointmentList);
+    } catch (err) {
+      console.error(
+        "Appointments fetching error:",
+        err.response?.data || err.message
       );
-    } catch (error) {
-      console.error("Appointments fetching error:", error);
+
+      setError(
+        err.response?.data?.message ||
+          "Unable to load your appointments."
+      );
     }
   }, [token]);
 
   // Load doctors and appointments
   useEffect(() => {
+    let isMounted = true;
+
     const loadData = async () => {
       if (!token || role !== "user") {
         setError("Please login as a user to view appointments.");
@@ -94,11 +117,17 @@ const Appointments = () => {
           fetchAppointments(),
         ]);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [token, role, fetchDoctors, fetchAppointments]);
 
   // Book appointment
@@ -110,6 +139,11 @@ const Appointments = () => {
       return;
     }
 
+    if (new Date(appointmentDate) <= new Date()) {
+      alert("Please select a future appointment date and time.");
+      return;
+    }
+
     try {
       setBooking(true);
 
@@ -118,11 +152,11 @@ const Appointments = () => {
         {
           doctorId: selectedDoctor._id,
           appointmentDate,
-          reason,
+          reason: reason.trim(),
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            ...authHeaders,
             "Content-Type": "application/json",
           },
           timeout: 30000,
@@ -136,11 +170,14 @@ const Appointments = () => {
       setReason("");
 
       await fetchAppointments();
-    } catch (error) {
-      console.error("Booking error:", error);
+    } catch (err) {
+      console.error(
+        "Booking error:",
+        err.response?.data || err.message
+      );
 
       alert(
-        error.response?.data?.message ||
+        err.response?.data?.message ||
           "Unable to book appointment. Please try again."
       );
     } finally {
@@ -162,9 +199,7 @@ const Appointments = () => {
       await axios.delete(
         `${BASE_URL}/api/appointments/${id}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: authHeaders,
           timeout: 30000,
         }
       );
@@ -172,11 +207,14 @@ const Appointments = () => {
       alert("Appointment cancelled successfully.");
 
       await fetchAppointments();
-    } catch (error) {
-      console.error("Cancel error:", error);
+    } catch (err) {
+      console.error(
+        "Cancel error:",
+        err.response?.data || err.message
+      );
 
       alert(
-        error.response?.data?.message ||
+        err.response?.data?.message ||
           "Unable to cancel appointment."
       );
     }
@@ -247,7 +285,7 @@ const Appointments = () => {
                   </div>
 
                   <div className="doctor-info">
-                    <h3>{doctor.name}</h3>
+                    <h3>{doctor.name || "Doctor"}</h3>
 
                     <p>
                       <strong>Doctor ID:</strong>{" "}
@@ -256,7 +294,7 @@ const Appointments = () => {
 
                     <p>
                       <strong>Email:</strong>{" "}
-                      {doctor.email}
+                      {doctor.email || "Not available"}
                     </p>
 
                     <p>
@@ -266,6 +304,7 @@ const Appointments = () => {
 
                     <button
                       className="book-doctor-btn"
+                      type="button"
                       onClick={() => setSelectedDoctor(doctor)}
                     >
                       Book Appointment
@@ -285,7 +324,7 @@ const Appointments = () => {
 
               <p>
                 Selected Doctor:{" "}
-                <strong>{selectedDoctor.name}</strong>
+                <strong>{selectedDoctor.name || "Doctor"}</strong>
               </p>
 
               <p>
@@ -340,6 +379,7 @@ const Appointments = () => {
                     type="button"
                     className="close-booking-btn"
                     onClick={() => setSelectedDoctor(null)}
+                    disabled={booking}
                   >
                     Cancel
                   </button>
@@ -389,19 +429,20 @@ const Appointments = () => {
 
                   <p>
                     <strong>Reason:</strong>{" "}
-                    {appointment.reason}
+                    {appointment.reason || "Not provided"}
                   </p>
 
                   <p>
                     <strong>Status:</strong>{" "}
                     <span className={`status ${appointment.status}`}>
-                      {appointment.status?.toUpperCase()}
+                      {appointment.status?.toUpperCase() || "PENDING"}
                     </span>
                   </p>
 
                   {appointment.status === "pending" && (
                     <button
                       className="cancel-appointment-btn"
+                      type="button"
                       onClick={() =>
                         handleCancel(appointment._id)
                       }
