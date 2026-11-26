@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import Navbar from "../components/Navbar";
 import "./Appointments.css";
@@ -20,13 +20,17 @@ const Appointments = () => {
   const [error, setError] = useState("");
 
   const token = localStorage.getItem("token");
-  const role = (
-    localStorage.getItem("role") || ""
-  ).trim().toLowerCase();
+  const role = (localStorage.getItem("role") || "")
+    .trim()
+    .toLowerCase();
 
-  const authHeaders = {
-    Authorization: `Bearer ${token}`,
-  };
+  // Memoize authorization headers
+  const authHeaders = useMemo(
+    () => ({
+      Authorization: `Bearer ${token}`,
+    }),
+    [token]
+  );
 
   // Get all registered doctors
   const fetchDoctors = useCallback(async () => {
@@ -61,7 +65,7 @@ const Appointments = () => {
           "Unable to load doctors. Please try again."
       );
     }
-  }, [token]);
+  }, [authHeaders]);
 
   // Get logged-in user's appointments
   const fetchAppointments = useCallback(async () => {
@@ -96,7 +100,7 @@ const Appointments = () => {
           "Unable to load your appointments."
       );
     }
-  }, [token]);
+  }, [authHeaders]);
 
   // Load doctors and appointments
   useEffect(() => {
