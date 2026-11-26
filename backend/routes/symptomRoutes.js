@@ -4,6 +4,9 @@ const axios = require("axios");
 
 const router = express.Router();
 
+// Get deployed Python ML service URL from environment
+const ML_URL = process.env.ML_SERVICE_URL;
+
 // POST /api/symptoms/check
 router.post("/check", async (req, res) => {
   console.log("1. Received symptom request");
@@ -11,7 +14,7 @@ router.post("/check", async (req, res) => {
   try {
     const { symptoms } = req.body || {};
 
-    // Step 1: Validate the selected symptoms
+    // Step 1: Validate selected symptoms
     if (
       !Array.isArray(symptoms) ||
       symptoms.length === 0 ||
@@ -27,14 +30,25 @@ router.post("/check", async (req, res) => {
       });
     }
 
+    // Step 2: Check ML service configuration
+    if (!ML_URL) {
+      console.error("ML_SERVICE_URL is not configured");
+
+      return res.status(500).json({
+        success: false,
+        message: "ML service URL is not configured on the server.",
+      });
+    }
+
     console.log("2. Sending symptoms to Flask ML service");
+    console.log("ML service URL:", ML_URL);
     console.log("Selected symptoms:", symptoms);
 
-    // Step 2: Call the Flask ML service on port 5001
+    // Step 3: Call deployed Flask ML service
     const response = await axios.post(
-      "http://127.0.0.1:5001/predict",
+      `${ML_URL.replace(/\/$/, "")}/predict`,
       { symptoms },
-      { timeout: 10000 }
+      { timeout: 30000 }
     );
 
     console.log("3. Flask response received");
@@ -42,7 +56,7 @@ router.post("/check", async (req, res) => {
 
     const data = response.data;
 
-    // Step 3: Validate the ML response
+    // Step 4: Validate ML response
     if (
       !data ||
       data.success !== true ||
@@ -54,7 +68,7 @@ router.post("/check", async (req, res) => {
       });
     }
 
-    // Step 4: Send the expected response format to React
+    // Step 5: Send response to React frontend
     return res.status(200).json({
       success: true,
       results: [
@@ -73,6 +87,7 @@ router.post("/check", async (req, res) => {
       disclaimer:
         "This model is not medically validated. Do not use its predictions to diagnose or treat illness.",
     });
+
   } catch (error) {
     console.error(
       "Symptom analysis error:",
@@ -80,7 +95,7 @@ router.post("/check", async (req, res) => {
       error.response?.data || error.message
     );
 
-    // Flask responded with an HTTP error
+    // Flask returned an error
     if (error.response) {
       return res.status(502).json({
         success: false,
@@ -89,11 +104,11 @@ router.post("/check", async (req, res) => {
       });
     }
 
-    // Flask is unreachable or the request timed out
+    // Flask is unreachable or request timed out
     return res.status(503).json({
       success: false,
       message:
-        "Cannot reach the Python ML service. Ensure Flask is running on port 5001.",
+        "Cannot reach the Python ML service. Please check its deployment.",
       details: error.message,
     });
   }
