@@ -63,8 +63,8 @@ const Login = () => {
       const response = await axios.post(
         `${API_URL.replace(/\/$/, "")}${endpoint}`,
         {
-          email,
-          password
+          ...formData,
+          email
         },
         {
           headers: {
