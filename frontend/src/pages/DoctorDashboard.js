@@ -24,14 +24,30 @@ function DoctorDashboard() {
     .toLowerCase();
 
   // ==========================================
+  // AUTH CONFIGURATION
+  // ==========================================
+
+  const getAuthConfig = () => {
+    const currentToken = localStorage.getItem("token");
+
+    return {
+      headers: {
+        Authorization: `Bearer ${currentToken}`,
+        "Content-Type": "application/json",
+      },
+      timeout: 60000,
+    };
+  };
+
+  // ==========================================
   // FETCH DOCTOR PROFILE AND APPOINTMENTS
   // ==========================================
 
   const fetchDoctorData = useCallback(async () => {
     const currentToken = localStorage.getItem("token");
-    const currentRole = (localStorage.getItem("role") || "")
-      .trim()
-      .toLowerCase();
+    const currentRole = (
+      localStorage.getItem("role") || ""
+    ).trim().toLowerCase();
 
     if (!currentToken || currentRole !== "doctor") {
       setLoading(false);
@@ -43,34 +59,35 @@ function DoctorDashboard() {
       setError("");
       setRefreshing(true);
 
-      const config = {
-        headers: {
-          Authorization: `Bearer ${currentToken}`,
-        },
-        timeout: 60000,
-      };
+      const config = getAuthConfig();
 
-      // Fetch profile and appointments independently
       const [profileResult, appointmentResult] =
         await Promise.allSettled([
           axios.get(
             `${BASE_URL}/api/doctors/profile`,
             config
           ),
+
           axios.get(
             `${BASE_URL}/api/appointments/doctor`,
             config
           ),
         ]);
 
-      // Handle authentication errors
-      const failedResult = [profileResult, appointmentResult].find(
+      // ==========================================
+      // AUTHENTICATION CHECK
+      // ==========================================
+
+      const unauthorized = [
+        profileResult,
+        appointmentResult,
+      ].some(
         (result) =>
           result.status === "rejected" &&
           result.reason?.response?.status === 401
       );
 
-      if (failedResult) {
+      if (unauthorized) {
         localStorage.removeItem("token");
         localStorage.removeItem("role");
         localStorage.removeItem("user");
@@ -95,6 +112,7 @@ function DoctorDashboard() {
         if (doctor && doctor.name) {
           setUser(doctor);
         } else {
+          setUser(null);
           setError("Doctor profile information was not found.");
         }
       } else {
@@ -105,10 +123,12 @@ function DoctorDashboard() {
           profileError.response?.data || profileError.message
         );
 
+        setUser(null);
+
         setError(
           profileError.response?.data?.message ||
           (profileError.code === "ERR_NETWORK"
-            ? "Cannot connect to the backend. Please check your Render service."
+            ? "Cannot connect to the backend. Check your Render service and API URL."
             : "Unable to load doctor profile.")
         );
       }
@@ -118,18 +138,23 @@ function DoctorDashboard() {
       // ==========================================
 
       if (appointmentResult.status === "fulfilled") {
-        const appointmentResponse = appointmentResult.value.data;
+        const responseData = appointmentResult.value.data;
 
-        const appointmentData =
-          appointmentResponse?.appointments ??
-          appointmentResponse?.data ??
-          appointmentResponse;
+        const appointmentData = Array.isArray(responseData)
+          ? responseData
+          : responseData?.appointments ||
+            responseData?.data ||
+            [];
 
         if (Array.isArray(appointmentData)) {
           setAppointments(appointmentData);
         } else {
           setAppointments([]);
-          setError("Invalid appointment data received from server.");
+          setError((previousError) =>
+            previousError
+              ? `${previousError} Invalid appointment data received.`
+              : "Invalid appointment data received from server."
+          );
         }
       } else {
         const appointmentError = appointmentResult.reason;
@@ -137,7 +162,7 @@ function DoctorDashboard() {
         console.error(
           "Doctor appointments error:",
           appointmentError.response?.data ||
-          appointmentError.message
+            appointmentError.message
         );
 
         setAppointments([]);
@@ -159,13 +184,17 @@ function DoctorDashboard() {
 
       setError(
         err.response?.data?.message ||
-        "Unable to load doctor dashboard."
+          "Unable to load doctor dashboard."
       );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [navigate]);
+
+  // ==========================================
+  // LOAD DASHBOARD
+  // ==========================================
 
   useEffect(() => {
     fetchDoctorData();
@@ -190,15 +219,10 @@ function DoctorDashboard() {
       await axios.patch(
         `${BASE_URL}/api/appointments/${appointmentId}/status`,
         { status },
-        {
-          headers: {
-            Authorization: `Bearer ${currentToken}`,
-            "Content-Type": "application/json",
-          },
-          timeout: 60000,
-        }
+        getAuthConfig()
       );
 
+      // Refresh dashboard after status update
       await fetchDoctorData();
     } catch (err) {
       console.error(
@@ -217,9 +241,9 @@ function DoctorDashboard() {
 
       setError(
         err.response?.data?.message ||
-        (err.code === "ERR_NETWORK"
-          ? "Cannot connect to the backend."
-          : "Unable to update appointment.")
+          (err.code === "ERR_NETWORK"
+            ? "Cannot connect to the backend."
+            : "Unable to update appointment.")
       );
     } finally {
       setUpdatingId(null);
@@ -240,7 +264,10 @@ function DoctorDashboard() {
     }
 
     return includeTime
-      ? parsedDate.toLocaleString("en-IN")
+      ? parsedDate.toLocaleString("en-IN", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
       : parsedDate.toLocaleDateString("en-IN");
   };
 
@@ -437,107 +464,113 @@ function DoctorDashboard() {
             </div>
           ) : (
             <div className="doctor-appointment-list">
-              {appointments.map((appointment) => (
-                <article
-                  className="doctor-appointment-card"
-                  key={appointment._id}
-                >
-                  {/* Patient Information */}
-                  <div className="doctor-appointment-header">
-                    <div>
-                      <h3>
-                        {appointment.patient?.name ||
-                          "Unknown Patient"}
-                      </h3>
+              {appointments.map((appointment) => {
+                const status = (
+                  appointment.status || "pending"
+                ).toLowerCase();
+
+                return (
+                  <article
+                    className="doctor-appointment-card"
+                    key={appointment._id}
+                  >
+                    {/* Patient Information */}
+                    <div className="doctor-appointment-header">
+                      <div>
+                        <h3>
+                          {appointment.patient?.name ||
+                            "Unknown Patient"}
+                        </h3>
+
+                        <p>
+                          {appointment.patient?.email ||
+                            "Email not available"}
+                        </p>
+                      </div>
+
+                      <span
+                        className={`doctor-status ${status}`}
+                      >
+                        {status}
+                      </span>
+                    </div>
+
+                    {/* Appointment Details */}
+                    <div className="doctor-appointment-details">
+                      <p>
+                        <strong>Appointment Date:</strong>{" "}
+                        {formatDate(appointment.appointmentDate)}
+                      </p>
 
                       <p>
-                        {appointment.patient?.email ||
-                          "Email not available"}
+                        <strong>Reason:</strong>{" "}
+                        {appointment.reason || "Not specified"}
+                      </p>
+
+                      <p>
+                        <strong>Request Submitted:</strong>{" "}
+                        {formatDate(appointment.createdAt, false)}
                       </p>
                     </div>
 
-                    <span
-                      className={`doctor-status ${appointment.status}`}
-                    >
-                      {appointment.status}
-                    </span>
-                  </div>
+                    {/* Pending Appointment Actions */}
+                    {status === "pending" && (
+                      <div className="doctor-action-buttons">
+                        <button
+                          type="button"
+                          className="doctor-accept-btn"
+                          disabled={updatingId === appointment._id}
+                          onClick={() =>
+                            updateAppointment(
+                              appointment._id,
+                              "accepted"
+                            )
+                          }
+                        >
+                          {updatingId === appointment._id
+                            ? "Updating..."
+                            : "Accept Request"}
+                        </button>
 
-                  {/* Appointment Details */}
-                  <div className="doctor-appointment-details">
-                    <p>
-                      <strong>Appointment Date:</strong>{" "}
-                      {formatDate(appointment.appointmentDate)}
-                    </p>
+                        <button
+                          type="button"
+                          className="doctor-reject-btn"
+                          disabled={updatingId === appointment._id}
+                          onClick={() =>
+                            updateAppointment(
+                              appointment._id,
+                              "rejected"
+                            )
+                          }
+                        >
+                          {updatingId === appointment._id
+                            ? "Updating..."
+                            : "Reject Request"}
+                        </button>
+                      </div>
+                    )}
 
-                    <p>
-                      <strong>Reason:</strong>{" "}
-                      {appointment.reason || "Not specified"}
-                    </p>
-
-                    <p>
-                      <strong>Request Submitted:</strong>{" "}
-                      {formatDate(appointment.createdAt, false)}
-                    </p>
-                  </div>
-
-                  {/* Pending Appointment Actions */}
-                  {appointment.status?.toLowerCase() === "pending" && (
-                    <div className="doctor-action-buttons">
+                    {/* Accepted Appointment Action */}
+                    {status === "accepted" && (
                       <button
                         type="button"
-                        className="doctor-accept-btn"
+                        className="doctor-complete-btn"
                         disabled={updatingId === appointment._id}
                         onClick={() =>
                           updateAppointment(
                             appointment._id,
-                            "accepted"
+                            "completed"
                           )
                         }
                       >
                         {updatingId === appointment._id
                           ? "Updating..."
-                          : "Accept Request"}
+                          : "Mark as Completed"}
                       </button>
-
-                      <button
-                        type="button"
-                        className="doctor-reject-btn"
-                        disabled={updatingId === appointment._id}
-                        onClick={() =>
-                          updateAppointment(
-                            appointment._id,
-                            "rejected"
-                          )
-                        }
-                      >
-                        {updatingId === appointment._id
-                          ? "Updating..."
-                          : "Reject Request"}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Accepted Appointment Action */}
-                  {appointment.status?.toLowerCase() === "accepted" && (
-                    <button
-                      type="button"
-                      className="doctor-complete-btn"
-                      disabled={updatingId === appointment._id}
-                      onClick={() =>
-                        updateAppointment(
-                          appointment._id,
-                          "completed"
-                        )
-                      }
-                    >
-                      {updatingId === appointment._id
-                        ? "Updating..."
-                        : "Mark as Completed"}
-                    </button>
-                  )}
-                </article>
-              ))}
+                    )}
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>

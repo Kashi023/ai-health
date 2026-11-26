@@ -18,25 +18,37 @@ function DoctorAppointments() {
   const [filter, setFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState(null);
 
+  // Get authentication headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("token");
+
+    return {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+  };
+
   // FETCH DOCTOR APPOINTMENTS
   const fetchAppointments = useCallback(async () => {
-    const currentToken = localStorage.getItem("token");
-    const role = (
-      localStorage.getItem("role") || ""
-    )
+    const token = localStorage.getItem("token");
+    const role = (localStorage.getItem("role") || "")
       .trim()
       .toLowerCase();
 
-    if (!currentToken) {
+    if (!token) {
       setError("Login session not found. Please login again.");
+      setAppointments([]);
       setLoading(false);
+      setRefreshing(false);
       navigate("/login", { replace: true });
       return;
     }
 
     if (role !== "doctor") {
       setError("Only doctors can access these appointments.");
+      setAppointments([]);
       setLoading(false);
+      setRefreshing(false);
       navigate("/dashboard", { replace: true });
       return;
     }
@@ -48,15 +60,16 @@ function DoctorAppointments() {
       const response = await axios.get(
         `${BASE_URL}/api/appointments/doctor`,
         {
-          headers: {
-            Authorization: `Bearer ${currentToken}`,
-          },
+          headers: getAuthHeaders(),
           timeout: 30000,
         }
       );
 
       const appointmentData =
-        response.data?.appointments ?? response.data;
+        response.data?.appointments ??
+        response.data?.data?.appointments ??
+        response.data?.data ??
+        response.data;
 
       if (!Array.isArray(appointmentData)) {
         throw new Error(
@@ -81,12 +94,12 @@ function DoctorAppointments() {
       }
 
       if (err.response?.status === 403) {
-        setError(
-          "Only doctors can access these appointments."
-        );
+        setError("Only doctors can access these appointments.");
       } else if (err.code === "ECONNABORTED") {
+        setError("Request timed out. Please try refreshing.");
+      } else if (!err.response) {
         setError(
-          "Request timed out. Please try refreshing."
+          "Cannot connect to the server. Please check your backend deployment and API URL."
         );
       } else {
         setError(
@@ -107,9 +120,9 @@ function DoctorAppointments() {
 
   // UPDATE APPOINTMENT STATUS
   const updateStatus = async (appointmentId, status) => {
-    const currentToken = localStorage.getItem("token");
+    const token = localStorage.getItem("token");
 
-    if (!currentToken) {
+    if (!token) {
       setError("Login session not found. Please login again.");
       navigate("/login", { replace: true });
       return;
@@ -123,14 +136,12 @@ function DoctorAppointments() {
         `${BASE_URL}/api/appointments/${appointmentId}/status`,
         { status },
         {
-          headers: {
-            Authorization: `Bearer ${currentToken}`,
-          },
+          headers: getAuthHeaders(),
           timeout: 30000,
         }
       );
 
-      // Refresh appointment list
+      // Refresh list after successful update
       await fetchAppointments();
     } catch (err) {
       console.error(
@@ -167,16 +178,20 @@ function DoctorAppointments() {
       return "Invalid date";
     }
 
-    return parsedDate.toLocaleString();
+    return parsedDate.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   // FILTER APPOINTMENTS
-  const filteredAppointments = appointments.filter(
-    (appointment) => {
-      if (filter === "all") return true;
-      return appointment.status === filter;
-    }
-  );
+  const filteredAppointments = appointments.filter((appointment) => {
+    if (filter === "all") return true;
+    return appointment.status === filter;
+  });
 
   // APPOINTMENT STATISTICS
   const pending = appointments.filter(
@@ -201,13 +216,10 @@ function DoctorAppointments() {
       <Navbar />
 
       <main className="doctor-appointments-page">
-
         {/* Page Heading */}
         <section className="appointments-heading">
           <div>
-            <p className="appointments-subtitle">
-              DOCTOR PORTAL
-            </p>
+            <p className="appointments-subtitle">DOCTOR PORTAL</p>
 
             <h1>Patient Appointments</h1>
 
@@ -325,7 +337,7 @@ function DoctorAppointments() {
                     <span
                       className={`appointment-status ${appointment.status}`}
                     >
-                      {appointment.status}
+                      {appointment.status || "pending"}
                     </span>
                   </div>
 
@@ -333,7 +345,6 @@ function DoctorAppointments() {
                   <div className="request-details">
                     <div>
                       <span>Appointment Date</span>
-
                       <strong>
                         {formatDate(appointment.appointmentDate)}
                       </strong>
@@ -341,7 +352,6 @@ function DoctorAppointments() {
 
                     <div>
                       <span>Request Submitted</span>
-
                       <strong>
                         {formatDate(appointment.createdAt)}
                       </strong>
@@ -349,7 +359,6 @@ function DoctorAppointments() {
 
                     <div className="reason-detail">
                       <span>Reason for Appointment</span>
-
                       <strong>
                         {appointment.reason || "Not specified"}
                       </strong>
@@ -364,10 +373,7 @@ function DoctorAppointments() {
                         className="accept-appointment-btn"
                         disabled={updatingId === appointment._id}
                         onClick={() =>
-                          updateStatus(
-                            appointment._id,
-                            "accepted"
-                          )
+                          updateStatus(appointment._id, "accepted")
                         }
                       >
                         {updatingId === appointment._id
@@ -380,10 +386,7 @@ function DoctorAppointments() {
                         className="reject-appointment-btn"
                         disabled={updatingId === appointment._id}
                         onClick={() =>
-                          updateStatus(
-                            appointment._id,
-                            "rejected"
-                          )
+                          updateStatus(appointment._id, "rejected")
                         }
                       >
                         {updatingId === appointment._id
@@ -401,10 +404,7 @@ function DoctorAppointments() {
                         className="complete-appointment-btn"
                         disabled={updatingId === appointment._id}
                         onClick={() =>
-                          updateStatus(
-                            appointment._id,
-                            "completed"
-                          )
+                          updateStatus(appointment._id, "completed")
                         }
                       >
                         {updatingId === appointment._id
