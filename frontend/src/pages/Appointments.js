@@ -1,16 +1,31 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import "./Appointments.css";
 import API_URL from "../config";
 
 const BASE_URL = API_URL.replace(/\/$/, "");
 
+const getLocalDateTime = (date = new Date()) => {
+  const localDate = new Date(
+    date.getTime() - date.getTimezoneOffset() * 60000
+  );
+
+  return localDate.toISOString().slice(0, 16);
+};
+
 const Appointments = () => {
+  const location = useLocation();
+
   const [doctors, setDoctors] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [selectedDoctor, setSelectedDoctor] = useState("");
+
+  const [selectedDoctor, setSelectedDoctor] = useState(
+    location.state?.doctorId || ""
+  );
+
   const [appointmentDate, setAppointmentDate] = useState("");
   const [reason, setReason] = useState("");
 
@@ -20,14 +35,24 @@ const Appointments = () => {
   const [success, setSuccess] = useState("");
 
   const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
+  const role = (localStorage.getItem("role") || "")
+    .trim()
+    .toLowerCase();
 
-  // Fetch available doctors
+  // Update selected doctor when navigating from Doctors page
+  useEffect(() => {
+    if (location.state?.doctorId) {
+      setSelectedDoctor(location.state.doctorId);
+    }
+  }, [location.state]);
+
+  // Fetch registered doctors
   const fetchDoctors = useCallback(async () => {
     if (!token) return;
 
     try {
       setLoading(true);
+      setError("");
 
       const response = await axios.get(
         `${BASE_URL}/api/doctors`,
@@ -39,14 +64,23 @@ const Appointments = () => {
         }
       );
 
-      const doctorData =
-        response.data?.doctors ||
-        response.data?.data ||
-        response.data;
+      const data = response.data;
 
-      setDoctors(Array.isArray(doctorData) ? doctorData : []);
+      const doctorData = Array.isArray(data)
+        ? data
+        : data?.doctors || data?.data || [];
+
+      if (!Array.isArray(doctorData)) {
+        throw new Error("Invalid doctor data received.");
+      }
+
+      setDoctors(doctorData);
     } catch (err) {
-      console.error("Fetch doctors error:", err);
+      console.error(
+        "Fetch doctors error:",
+        err.response?.data || err.message
+      );
+
       setError(
         err.response?.data?.message ||
         "Unable to load doctors. Please try again."
@@ -56,7 +90,7 @@ const Appointments = () => {
     }
   }, [token]);
 
-  // Fetch user's appointments
+  // Fetch patient's appointments
   const fetchAppointments = useCallback(async () => {
     if (!token) return;
 
@@ -71,16 +105,23 @@ const Appointments = () => {
         }
       );
 
-      const appointmentData =
-        response.data?.appointments ||
-        response.data?.data ||
-        response.data;
+      const data = response.data;
 
-      setAppointments(
-        Array.isArray(appointmentData) ? appointmentData : []
-      );
+      const appointmentData = Array.isArray(data)
+        ? data
+        : data?.appointments || data?.data || [];
+
+      if (!Array.isArray(appointmentData)) {
+        throw new Error("Invalid appointment data received.");
+      }
+
+      setAppointments(appointmentData);
     } catch (err) {
-      console.error("Fetch appointments error:", err);
+      console.error(
+        "Fetch appointments error:",
+        err.response?.data || err.message
+      );
+
       setError(
         err.response?.data?.message ||
         "Unable to load your appointments."
@@ -88,7 +129,7 @@ const Appointments = () => {
     }
   }, [token]);
 
-  // Load data
+  // Load doctors and appointments
   useEffect(() => {
     if (!token) {
       setError("Please log in to view appointments.");
@@ -96,7 +137,7 @@ const Appointments = () => {
     }
 
     if (role !== "user") {
-      setError("Only users can book appointments.");
+      setError("Only patients can book appointments.");
       return;
     }
 
@@ -118,20 +159,36 @@ const Appointments = () => {
 
     const selectedDate = new Date(appointmentDate);
 
-    if (Number.isNaN(selectedDate.getTime()) ||
-        selectedDate <= new Date()) {
+    if (
+      Number.isNaN(selectedDate.getTime()) ||
+      selectedDate <= new Date()
+    ) {
       setError("Please select a future appointment date and time.");
+      return;
+    }
+
+    const doctor = doctors.find(
+      (item) => item._id === selectedDoctor
+    );
+
+    if (!doctor) {
+      setError("Please select a valid doctor.");
+      return;
+    }
+
+    if (doctor.available === false) {
+      setError("This doctor is currently unavailable.");
       return;
     }
 
     try {
       setBooking(true);
 
-      await axios.post(
+      const response = await axios.post(
         `${BASE_URL}/api/appointments`,
         {
           doctorId: selectedDoctor,
-          appointmentDate,
+          appointmentDate: selectedDate.toISOString(),
           reason: reason.trim(),
         },
         {
@@ -143,7 +200,16 @@ const Appointments = () => {
         }
       );
 
-      setSuccess("Appointment booked successfully!");
+      if (response.data?.success === false) {
+        throw new Error(
+          response.data.message || "Appointment booking failed."
+        );
+      }
+
+      setSuccess(
+        response.data?.message ||
+        "Appointment booked successfully!"
+      );
 
       setSelectedDoctor("");
       setAppointmentDate("");
@@ -151,10 +217,14 @@ const Appointments = () => {
 
       await fetchAppointments();
     } catch (err) {
-      console.error("Booking error:", err);
+      console.error(
+        "Booking error:",
+        err.response?.data || err.message
+      );
 
       setError(
         err.response?.data?.message ||
+        err.message ||
         "Failed to book appointment. Please try again."
       );
     } finally {
@@ -164,9 +234,11 @@ const Appointments = () => {
 
   // Cancel appointment
   const handleCancel = async (appointmentId) => {
-    if (!window.confirm("Are you sure you want to cancel this appointment?")) {
-      return;
-    }
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this appointment?"
+    );
+
+    if (!confirmed) return;
 
     setError("");
     setSuccess("");
@@ -183,9 +255,13 @@ const Appointments = () => {
       );
 
       setSuccess("Appointment cancelled successfully!");
+
       await fetchAppointments();
     } catch (err) {
-      console.error("Cancel appointment error:", err);
+      console.error(
+        "Cancel appointment error:",
+        err.response?.data || err.message
+      );
 
       setError(
         err.response?.data?.message ||
@@ -194,13 +270,37 @@ const Appointments = () => {
     }
   };
 
+  // Format appointment date
   const formatDate = (date) => {
     if (!date) return "Not available";
 
-    return new Date(date).toLocaleString("en-IN", {
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "Invalid date";
+    }
+
+    return parsedDate.toLocaleString("en-IN", {
       dateStyle: "medium",
       timeStyle: "short",
     });
+  };
+
+  // Get doctor details from populated appointment
+  const getDoctorInfo = (appointment) => {
+    const doctor =
+      appointment.doctor && typeof appointment.doctor === "object"
+        ? appointment.doctor
+        : appointment.doctorId &&
+          typeof appointment.doctorId === "object"
+        ? appointment.doctorId
+        : {};
+
+    return {
+      name: doctor.name || "Doctor",
+      email: doctor.email || "Not available",
+      specialization: doctor.specialization || "Not available",
+    };
   };
 
   if (!token) {
@@ -219,7 +319,7 @@ const Appointments = () => {
       <>
         <Navbar />
         <div className="appointments-container">
-          <h2>Only users can book appointments.</h2>
+          <h2>Only patients can book appointments.</h2>
         </div>
       </>
     );
@@ -260,21 +360,22 @@ const Appointments = () => {
                 value={selectedDoctor}
                 onChange={(e) => setSelectedDoctor(e.target.value)}
                 required
+                disabled={loading}
               >
                 <option value="">Choose a doctor</option>
 
-                {doctors.map((doctor) => (
-                  <option
-                    key={doctor._id}
-                    value={doctor._id}
-                  >
-                    {doctor.name} - {doctor.specialization}
-                  </option>
-                ))}
+                {doctors
+                  .filter((doctor) => doctor.available !== false)
+                  .map((doctor) => (
+                    <option key={doctor._id} value={doctor._id}>
+                      {doctor.name || "Doctor"} -{" "}
+                      {doctor.specialization || "General"}
+                    </option>
+                  ))}
               </select>
 
               {!loading && doctors.length === 0 && (
-                <small>No doctors are currently available.</small>
+                <small>No registered doctors found.</small>
               )}
             </div>
 
@@ -287,9 +388,7 @@ const Appointments = () => {
                 id="appointmentDate"
                 type="datetime-local"
                 value={appointmentDate}
-                min={new Date(Date.now() + 60000)
-                  .toISOString()
-                  .slice(0, 16)}
+                min={getLocalDateTime(new Date(Date.now() + 60000))}
                 onChange={(e) => setAppointmentDate(e.target.value)}
                 required
               />
@@ -311,7 +410,12 @@ const Appointments = () => {
             <button
               type="submit"
               className="book-appointment-btn"
-              disabled={booking || loading || doctors.length === 0}
+              disabled={
+                booking ||
+                loading ||
+                doctors.filter((doctor) => doctor.available !== false)
+                  .length === 0
+              }
             >
               {booking ? "Booking..." : "Book Appointment"}
             </button>
@@ -329,13 +433,11 @@ const Appointments = () => {
           ) : (
             <div className="appointments-list">
               {appointments.map((appointment) => {
-                const doctor =
-                  appointment.doctorId &&
-                  typeof appointment.doctorId === "object"
-                    ? appointment.doctorId
-                    : appointment.doctor || {};
+                const doctor = getDoctorInfo(appointment);
 
-                const status = appointment.status || "Pending";
+                const status = (
+                  appointment.status || "pending"
+                ).toLowerCase();
 
                 return (
                   <div
@@ -343,25 +445,24 @@ const Appointments = () => {
                     key={appointment._id}
                   >
                     <div className="appointment-card-header">
-                      <h3>
-                        Dr. {doctor.name || "Doctor"}
-                      </h3>
+                      <h3>Dr. {doctor.name}</h3>
 
                       <span
-                        className={`appointment-status ${status.toLowerCase()}`}
+                        className={`appointment-status ${status}`}
                       >
-                        {status}
+                        {status.charAt(0).toUpperCase() +
+                          status.slice(1)}
                       </span>
                     </div>
 
                     <p>
                       <strong>Specialization:</strong>{" "}
-                      {doctor.specialization || "Not available"}
+                      {doctor.specialization}
                     </p>
 
                     <p>
                       <strong>Doctor Email:</strong>{" "}
-                      {doctor.email || "Not available"}
+                      {doctor.email}
                     </p>
 
                     <p>
@@ -374,7 +475,7 @@ const Appointments = () => {
                       {appointment.reason || "Not provided"}
                     </p>
 
-                    {status.toLowerCase() === "pending" && (
+                    {status === "pending" && (
                       <button
                         type="button"
                         className="cancel-appointment-btn"
