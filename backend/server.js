@@ -13,13 +13,18 @@ const authRoutes = require("./routes/authRoutes");
 
 const app = express();
 
-app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://ai-health-p8fh-tau.vercel.app/login"
-  ],
-  credentials: true
-}));
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://ai-health-p8fh-coic6a1fj-kashish23.vercel.app"
+];
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  })
+);
 
 // Middleware
 app.use(express.json());
