@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Navbar from "../components/Navbar";
 import "./Appointments.css";
-import API_URL from "../config";
 
-const BASE_URL = API_URL.replace(/\/$/, "");
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const Appointments = () => {
   const [doctors, setDoctors] = useState([]);
@@ -20,86 +19,63 @@ const Appointments = () => {
   const [error, setError] = useState("");
 
   const token = localStorage.getItem("token");
-  const role = (localStorage.getItem("role") || "").trim().toLowerCase();
+  const role = localStorage.getItem("role");
 
-  // Fetch all registered doctors
+  // Get all registered doctors
   const fetchDoctors = useCallback(async () => {
     try {
       const response = await axios.get(
-        `${BASE_URL}/api/doctors`,
+        `${API_URL}/api/doctors`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          timeout: 30000,
         }
       );
 
       const data = response.data;
 
-      const doctorList = Array.isArray(data)
-        ? data
-        : data?.doctors || data?.data || [];
-
-      if (!Array.isArray(doctorList)) {
-        throw new Error("Invalid doctor data received.");
-      }
-
-      setDoctors(doctorList);
-    } catch (err) {
-      console.error(
-        "Doctor fetching error:",
-        err.response?.data || err.message
+      setDoctors(
+        Array.isArray(data)
+          ? data
+          : data.doctors || data.data || []
       );
+    } catch (error) {
+      console.error("Doctor fetching error:", error);
 
       setError(
-        err.response?.data?.message ||
-          "Unable to load doctors. Please try again."
+        error.response?.data?.message ||
+          "Unable to load doctors. Please check the doctor API."
       );
     }
   }, [token]);
 
-  // Fetch logged-in user's appointments
+  // Get user's appointments
   const fetchAppointments = useCallback(async () => {
     try {
       const response = await axios.get(
-        `${BASE_URL}/api/appointments/my`,
+        `${API_URL}/api/appointments/my`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          timeout: 30000,
         }
       );
 
       const data = response.data;
 
-      const appointmentList = Array.isArray(data)
-        ? data
-        : data?.appointments || data?.data || [];
-
-      if (!Array.isArray(appointmentList)) {
-        throw new Error("Invalid appointment data received.");
-      }
-
-      setAppointments(appointmentList);
-    } catch (err) {
-      console.error(
-        "Appointments fetching error:",
-        err.response?.data || err.message
+      setAppointments(
+        Array.isArray(data)
+          ? data
+          : data.appointments || data.data || []
       );
-
-      setError(
-        err.response?.data?.message ||
-          "Unable to load your appointments."
-      );
+    } catch (error) {
+      console.error("Appointments fetching error:", error);
     }
   }, [token]);
 
   // Load doctors and appointments
   useEffect(() => {
-    let isMounted = true;
-
     const loadData = async () => {
       if (!token || role !== "user") {
         setError("Please login as a user to view appointments.");
@@ -115,17 +91,11 @@ const Appointments = () => {
           fetchAppointments(),
         ]);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
     loadData();
-
-    return () => {
-      isMounted = false;
-    };
   }, [token, role, fetchDoctors, fetchAppointments]);
 
   // Book appointment
@@ -137,27 +107,20 @@ const Appointments = () => {
       return;
     }
 
-    if (new Date(appointmentDate) <= new Date()) {
-      alert("Please select a future appointment date and time.");
-      return;
-    }
-
     try {
       setBooking(true);
 
       await axios.post(
-        `${BASE_URL}/api/appointments`,
+        `${API_URL}/api/appointments`,
         {
           doctorId: selectedDoctor._id,
           appointmentDate,
-          reason: reason.trim(),
+          reason,
         },
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
           },
-          timeout: 30000,
         }
       );
 
@@ -168,14 +131,11 @@ const Appointments = () => {
       setReason("");
 
       await fetchAppointments();
-    } catch (err) {
-      console.error(
-        "Booking error:",
-        err.response?.data || err.message
-      );
+    } catch (error) {
+      console.error("Booking error:", error);
 
       alert(
-        err.response?.data?.message ||
+        error.response?.data?.message ||
           "Unable to book appointment. Please try again."
       );
     } finally {
@@ -183,36 +143,34 @@ const Appointments = () => {
     }
   };
 
-  // Cancel appointment
+  // Cancel pending appointment
   const handleCancel = async (id) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to cancel this appointment?"
-    );
-
-    if (!confirmed) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to cancel this appointment?"
+      )
+    ) {
+      return;
+    }
 
     try {
       await axios.delete(
-        `${BASE_URL}/api/appointments/${id}`,
+        `${API_URL}/api/appointments/${id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          timeout: 30000,
         }
       );
 
       alert("Appointment cancelled successfully.");
 
       await fetchAppointments();
-    } catch (err) {
-      console.error(
-        "Cancel error:",
-        err.response?.data || err.message
-      );
+    } catch (error) {
+      console.error("Cancel error:", error);
 
       alert(
-        err.response?.data?.message ||
+        error.response?.data?.message ||
           "Unable to cancel appointment."
       );
     }
@@ -228,7 +186,6 @@ const Appointments = () => {
     });
   };
 
-  // Loading screen
   if (loading) {
     return (
       <>
@@ -274,7 +231,7 @@ const Appointments = () => {
                     {doctor.profileImage ? (
                       <img
                         src={doctor.profileImage}
-                        alt={doctor.name || "Doctor"}
+                        alt={doctor.name}
                       />
                     ) : (
                       <span>
@@ -284,15 +241,16 @@ const Appointments = () => {
                   </div>
 
                   <div className="doctor-info">
-                    <h3>{doctor.name || "Doctor"}</h3>
+                    <h3>{doctor.name}</h3>
 
                     <p>
-                      <strong>Doctor ID:</strong> {doctor._id}
+                      <strong>Doctor ID:</strong>{" "}
+                      {doctor._id}
                     </p>
 
                     <p>
                       <strong>Email:</strong>{" "}
-                      {doctor.email || "Not available"}
+                      {doctor.email}
                     </p>
 
                     <p>
@@ -302,7 +260,6 @@ const Appointments = () => {
 
                     <button
                       className="book-doctor-btn"
-                      type="button"
                       onClick={() => setSelectedDoctor(doctor)}
                     >
                       Book Appointment
@@ -322,11 +279,12 @@ const Appointments = () => {
 
               <p>
                 Selected Doctor:{" "}
-                <strong>{selectedDoctor.name || "Doctor"}</strong>
+                <strong>{selectedDoctor.name}</strong>
               </p>
 
               <p>
-                Doctor ID: <strong>{selectedDoctor._id}</strong>
+                Doctor ID:{" "}
+                <strong>{selectedDoctor._id}</strong>
               </p>
 
               <form onSubmit={handleBooking}>
@@ -354,7 +312,9 @@ const Appointments = () => {
                 <textarea
                   placeholder="Describe your reason for booking..."
                   value={reason}
-                  onChange={(e) => setReason(e.target.value)}
+                  onChange={(e) =>
+                    setReason(e.target.value)
+                  }
                   rows="4"
                   required
                 />
@@ -374,7 +334,6 @@ const Appointments = () => {
                     type="button"
                     className="close-booking-btn"
                     onClick={() => setSelectedDoctor(null)}
-                    disabled={booking}
                   >
                     Cancel
                   </button>
@@ -424,21 +383,22 @@ const Appointments = () => {
 
                   <p>
                     <strong>Reason:</strong>{" "}
-                    {appointment.reason || "Not provided"}
+                    {appointment.reason}
                   </p>
 
                   <p>
                     <strong>Status:</strong>{" "}
                     <span className={`status ${appointment.status}`}>
-                      {appointment.status?.toUpperCase() || "PENDING"}
+                      {appointment.status?.toUpperCase()}
                     </span>
                   </p>
 
                   {appointment.status === "pending" && (
                     <button
                       className="cancel-appointment-btn"
-                      type="button"
-                      onClick={() => handleCancel(appointment._id)}
+                      onClick={() =>
+                        handleCancel(appointment._id)
+                      }
                     >
                       Cancel Request
                     </button>
