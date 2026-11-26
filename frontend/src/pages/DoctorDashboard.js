@@ -23,12 +23,13 @@ function DoctorDashboard() {
     .trim()
     .toLowerCase();
 
+  // ==========================================
   // FETCH DOCTOR PROFILE AND APPOINTMENTS
+  // ==========================================
+
   const fetchDoctorData = useCallback(async () => {
     const currentToken = localStorage.getItem("token");
-    const currentRole = (
-      localStorage.getItem("role") || ""
-    )
+    const currentRole = (localStorage.getItem("role") || "")
       .trim()
       .toLowerCase();
 
@@ -46,11 +47,12 @@ function DoctorDashboard() {
         headers: {
           Authorization: `Bearer ${currentToken}`,
         },
-        timeout: 30000,
+        timeout: 60000,
       };
 
-      const [profileResponse, appointmentResponse] =
-        await Promise.all([
+      // Fetch profile and appointments independently
+      const [profileResult, appointmentResult] =
+        await Promise.allSettled([
           axios.get(
             `${BASE_URL}/api/doctors/profile`,
             config
@@ -61,37 +63,14 @@ function DoctorDashboard() {
           ),
         ]);
 
-      // Extract doctor profile
-      const doctor =
-        profileResponse.data?.doctor ||
-        profileResponse.data?.user ||
-        profileResponse.data;
-
-      if (!doctor || !doctor.name) {
-        throw new Error("Doctor profile not found.");
-      }
-
-      setUser(doctor);
-
-      // Extract appointment data
-      const appointmentData =
-        appointmentResponse.data?.appointments ??
-        appointmentResponse.data;
-
-      if (!Array.isArray(appointmentData)) {
-        throw new Error(
-          "Invalid appointment data received from server."
-        );
-      }
-
-      setAppointments(appointmentData);
-    } catch (err) {
-      console.error(
-        "Doctor dashboard error:",
-        err.response?.data || err.message
+      // Handle authentication errors
+      const failedResult = [profileResult, appointmentResult].find(
+        (result) =>
+          result.status === "rejected" &&
+          result.reason?.response?.status === 401
       );
 
-      if (err.response?.status === 401) {
+      if (failedResult) {
         localStorage.removeItem("token");
         localStorage.removeItem("role");
         localStorage.removeItem("user");
@@ -100,17 +79,88 @@ function DoctorDashboard() {
         return;
       }
 
-      if (err.response?.status === 403) {
-        setError(
-          "Only doctors can access this dashboard."
-        );
+      // ==========================================
+      // DOCTOR PROFILE
+      // ==========================================
+
+      if (profileResult.status === "fulfilled") {
+        const profileData = profileResult.value.data;
+
+        const doctor =
+          profileData?.doctor ||
+          profileData?.user ||
+          profileData?.data ||
+          profileData;
+
+        if (doctor && doctor.name) {
+          setUser(doctor);
+        } else {
+          setError("Doctor profile information was not found.");
+        }
       } else {
+        const profileError = profileResult.reason;
+
+        console.error(
+          "Doctor profile error:",
+          profileError.response?.data || profileError.message
+        );
+
         setError(
-          err.response?.data?.message ||
-            err.message ||
-            "Unable to load doctor dashboard."
+          profileError.response?.data?.message ||
+          (profileError.code === "ERR_NETWORK"
+            ? "Cannot connect to the backend. Please check your Render service."
+            : "Unable to load doctor profile.")
         );
       }
+
+      // ==========================================
+      // DOCTOR APPOINTMENTS
+      // ==========================================
+
+      if (appointmentResult.status === "fulfilled") {
+        const appointmentResponse = appointmentResult.value.data;
+
+        const appointmentData =
+          appointmentResponse?.appointments ??
+          appointmentResponse?.data ??
+          appointmentResponse;
+
+        if (Array.isArray(appointmentData)) {
+          setAppointments(appointmentData);
+        } else {
+          setAppointments([]);
+          setError("Invalid appointment data received from server.");
+        }
+      } else {
+        const appointmentError = appointmentResult.reason;
+
+        console.error(
+          "Doctor appointments error:",
+          appointmentError.response?.data ||
+          appointmentError.message
+        );
+
+        setAppointments([]);
+
+        setError((previousError) =>
+          previousError
+            ? `${previousError} Appointments could not be loaded.`
+            : appointmentError.response?.data?.message ||
+              (appointmentError.code === "ERR_NETWORK"
+                ? "Cannot connect to the appointment service. Check your backend and CORS settings."
+                : "Unable to load appointments.")
+        );
+      }
+    } catch (err) {
+      console.error(
+        "Doctor dashboard error:",
+        err.response?.data || err.message
+      );
+
+      setError(
+        err.response?.data?.message ||
+        "Unable to load doctor dashboard."
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -121,7 +171,10 @@ function DoctorDashboard() {
     fetchDoctorData();
   }, [fetchDoctorData]);
 
+  // ==========================================
   // UPDATE APPOINTMENT STATUS
+  // ==========================================
+
   const updateAppointment = async (appointmentId, status) => {
     const currentToken = localStorage.getItem("token");
 
@@ -140,8 +193,9 @@ function DoctorDashboard() {
         {
           headers: {
             Authorization: `Bearer ${currentToken}`,
+            "Content-Type": "application/json",
           },
-          timeout: 30000,
+          timeout: 60000,
         }
       );
 
@@ -163,15 +217,19 @@ function DoctorDashboard() {
 
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Unable to update appointment."
+        (err.code === "ERR_NETWORK"
+          ? "Cannot connect to the backend."
+          : "Unable to update appointment.")
       );
     } finally {
       setUpdatingId(null);
     }
   };
 
+  // ==========================================
   // FORMAT DATE
+  // ==========================================
+
   const formatDate = (date, includeTime = true) => {
     if (!date) return "Not available";
 
@@ -182,16 +240,22 @@ function DoctorDashboard() {
     }
 
     return includeTime
-      ? parsedDate.toLocaleString()
-      : parsedDate.toLocaleDateString();
+      ? parsedDate.toLocaleString("en-IN")
+      : parsedDate.toLocaleDateString("en-IN");
   };
 
+  // ==========================================
   // AUTHENTICATION CHECK
+  // ==========================================
+
   if (!token || role !== "doctor") {
     return <Navigate to="/login" replace />;
   }
 
+  // ==========================================
   // LOADING STATE
+  // ==========================================
+
   if (loading) {
     return (
       <>
@@ -204,7 +268,10 @@ function DoctorDashboard() {
     );
   }
 
+  // ==========================================
   // PROFILE ERROR STATE
+  // ==========================================
+
   if (!user) {
     return (
       <>
@@ -227,24 +294,30 @@ function DoctorDashboard() {
     );
   }
 
+  // ==========================================
   // APPOINTMENT STATISTICS
+  // ==========================================
+
   const pendingCount = appointments.filter(
-    (item) => item.status === "pending"
+    (item) => item.status?.toLowerCase() === "pending"
   ).length;
 
   const acceptedCount = appointments.filter(
-    (item) => item.status === "accepted"
+    (item) => item.status?.toLowerCase() === "accepted"
   ).length;
 
   const rejectedCount = appointments.filter(
-    (item) => item.status === "rejected"
+    (item) => item.status?.toLowerCase() === "rejected"
   ).length;
 
   const completedCount = appointments.filter(
-    (item) => item.status === "completed"
+    (item) => item.status?.toLowerCase() === "completed"
   ).length;
 
+  // ==========================================
   // DASHBOARD UI
+  // ==========================================
+
   return (
     <>
       <Navbar />
@@ -409,7 +482,7 @@ function DoctorDashboard() {
                   </div>
 
                   {/* Pending Appointment Actions */}
-                  {appointment.status === "pending" && (
+                  {appointment.status?.toLowerCase() === "pending" && (
                     <div className="doctor-action-buttons">
                       <button
                         type="button"
@@ -446,7 +519,7 @@ function DoctorDashboard() {
                   )}
 
                   {/* Accepted Appointment Action */}
-                  {appointment.status === "accepted" && (
+                  {appointment.status?.toLowerCase() === "accepted" && (
                     <button
                       type="button"
                       className="doctor-complete-btn"
