@@ -1,61 +1,62 @@
 
-/* ================================
-   APPOINTMENTS PAGE
-================================ */
+/* =========================================
+   APPOINTMENTS PAGE - HEALTH AI
+========================================= */
 
 .appointments-container {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 45px 30px 70px;
+  max-width: 1250px;
   min-height: 100vh;
+  margin: 0 auto;
+  padding: 40px 35px 70px;
   box-sizing: border-box;
-  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  background: #f5f8fc;
   color: #1e293b;
-  background: #f7faff;
+  font-family: "Inter", "Segoe UI", sans-serif;
 }
 
-/* ================================
+/* =========================================
    PAGE HEADER
-================================ */
+========================================= */
 
 .appointments-header {
-  margin-bottom: 35px;
+  margin-bottom: 32px;
 }
 
 .appointments-header h1 {
+  margin: 0 0 8px;
+  color: #163b65;
   font-size: 32px;
   font-weight: 750;
-  color: #12345b;
-  margin: 0 0 10px;
-  letter-spacing: -0.8px;
+  letter-spacing: -0.7px;
 }
 
 .appointments-header p {
-  font-size: 15px;
-  color: #64748b;
   margin: 0;
+  color: #718096;
+  font-size: 15px;
   line-height: 1.6;
 }
 
-/* ================================
+/* =========================================
    ALERT MESSAGES
-================================ */
+========================================= */
 
 .appointment-message {
+  display: flex;
+  align-items: center;
   padding: 14px 18px;
   margin-bottom: 22px;
   border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
   line-height: 1.5;
-  animation: slideIn 0.3s ease;
 }
 
 .error-message {
   color: #b42318;
   background: #fff1f0;
-  border: 1px solid #fecaca;
+  border: 1px solid #fecdca;
 }
 
 .success-message {
@@ -64,51 +65,44 @@
   border: 1px solid #abefc6;
 }
 
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ================================
-   BOOKING FORM SECTION
-================================ */
+/* =========================================
+   BOOKING FORM CARD
+========================================= */
 
 .appointment-form-section {
-  background: #ffffff;
+  width: 100%;
+  box-sizing: border-box;
   padding: 32px;
-  border: 1px solid #e5edf6;
+  margin-bottom: 42px;
+  background: #ffffff;
+  border: 1px solid #e7edf5;
   border-radius: 16px;
-  box-shadow: 0 5px 22px rgba(30, 64, 115, 0.055);
-  margin-bottom: 40px;
+  box-shadow: 0 5px 25px rgba(30, 64, 115, 0.055);
 }
 
 .appointment-form-section h2,
 .appointment-list-section h2 {
+  margin: 0 0 26px;
+  color: #183b60;
   font-size: 21px;
   font-weight: 700;
-  color: #12345b;
-  margin: 0 0 25px;
 }
 
-/* Form groups */
+/* =========================================
+   FORM FIELDS
+========================================= */
 
 .form-group {
   display: flex;
   flex-direction: column;
-  margin-bottom: 22px;
+  margin-bottom: 23px;
 }
 
 .form-group label {
+  margin-bottom: 9px;
+  color: #34445b;
   font-size: 14px;
   font-weight: 650;
-  color: #334155;
-  margin-bottom: 9px;
 }
 
 .form-group input,
@@ -117,20 +111,19 @@
   width: 100%;
   box-sizing: border-box;
   padding: 13px 15px;
-  border: 1px solid #d6e0ec;
+  border: 1px solid #dce5ef;
   border-radius: 9px;
   outline: none;
   background: #fbfdff;
-  color: #1e293b;
+  color: #26364a;
   font-family: inherit;
   font-size: 14px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease,
-    background 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .form-group input,
 .form-group select {
-  min-height: 47px;
+  height: 48px;
 }
 
 .form-group textarea {
@@ -141,45 +134,50 @@
 
 .form-group input::placeholder,
 .form-group textarea::placeholder {
-  color: #94a3b8;
+  color: #9aa9ba;
 }
 
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-  border-color: #2585d8;
+  border-color: #2785c8;
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(37, 133, 216, 0.12);
+  box-shadow: 0 0 0 3px rgba(39, 133, 200, 0.12);
+}
+
+.form-group select {
+  cursor: pointer;
 }
 
 .form-group small {
   margin-top: 8px;
-  color: #dc6b36;
+  color: #d97706;
   font-size: 12px;
 }
 
-/* ================================
-   BOOK BUTTON
-================================ */
+/* =========================================
+   BOOK APPOINTMENT BUTTON
+========================================= */
 
 .book-appointment-btn {
+  display: block;
   width: 100%;
   min-height: 49px;
+  padding: 13px 20px;
   border: none;
   border-radius: 9px;
-  padding: 13px 22px;
-  background: linear-gradient(110deg, #1769aa, #168f9b);
+  background: linear-gradient(110deg, #1769aa, #1595a0);
   color: #ffffff;
   font-size: 15px;
   font-weight: 650;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease,
-    opacity 0.2s ease;
+  transition: all 0.25s ease;
 }
 
 .book-appointment-btn:hover:not(:disabled) {
+  background: linear-gradient(110deg, #125b96, #117e89);
+  box-shadow: 0 7px 18px rgba(23, 105, 170, 0.22);
   transform: translateY(-2px);
-  box-shadow: 0 7px 17px rgba(22, 105, 170, 0.22);
 }
 
 .book-appointment-btn:active:not(:disabled) {
@@ -191,31 +189,33 @@
   cursor: not-allowed;
 }
 
-/* ================================
-   APPOINTMENT LIST
-================================ */
+/* =========================================
+   APPOINTMENT LIST SECTION
+========================================= */
 
 .appointment-list-section {
+  width: 100%;
   margin-top: 38px;
 }
 
 .appointment-list-section h2 {
-  margin-bottom: 22px;
+  margin-bottom: 23px;
 }
 
 .no-appointments {
-  padding: 35px 20px;
-  background: #ffffff;
+  padding: 38px 20px;
+  margin: 0;
   border: 1px dashed #cbd8e6;
   border-radius: 13px;
-  text-align: center;
-  color: #64748b;
+  background: #ffffff;
+  color: #718096;
   font-size: 14px;
+  text-align: center;
 }
 
-/* ================================
-   APPOINTMENT CARDS
-================================ */
+/* =========================================
+   APPOINTMENT CARDS GRID
+========================================= */
 
 .appointments-list {
   display: grid;
@@ -224,21 +224,25 @@
 }
 
 .appointment-card {
-  position: relative;
-  background: #ffffff;
+  min-width: 0;
   padding: 25px;
-  border: 1px solid #e5edf6;
+  box-sizing: border-box;
+  border: 1px solid #e5edf5;
   border-radius: 14px;
+  background: #ffffff;
   box-shadow: 0 4px 18px rgba(30, 64, 115, 0.045);
-  transition: transform 0.2s ease, box-shadow 0.2s ease,
-    border-color 0.2s ease;
+  transition: all 0.25s ease;
 }
 
 .appointment-card:hover {
-  transform: translateY(-3px);
-  border-color: #b9d9ef;
+  border-color: #b8d8ee;
   box-shadow: 0 9px 25px rgba(30, 64, 115, 0.09);
+  transform: translateY(-3px);
 }
+
+/* =========================================
+   CARD HEADER
+========================================= */
 
 .appointment-card-header {
   display: flex;
@@ -248,19 +252,19 @@
   gap: 12px;
   padding-bottom: 17px;
   margin-bottom: 17px;
-  border-bottom: 1px solid #edf2f7;
+  border-bottom: 1px solid #edf1f6;
 }
 
 .appointment-card-header h3 {
+  margin: 0;
   color: #17436b;
   font-size: 18px;
   font-weight: 700;
-  margin: 0;
 }
 
-/* ================================
-   STATUS BADGES
-================================ */
+/* =========================================
+   APPOINTMENT STATUS
+========================================= */
 
 .appointment-status {
   display: inline-flex;
@@ -270,60 +274,68 @@
   border-radius: 30px;
   font-size: 11px;
   font-weight: 700;
-  text-transform: capitalize;
   letter-spacing: 0.3px;
+  text-transform: capitalize;
 }
 
+/* Pending */
+
 .appointment-status.pending {
-  color: #a15c00;
   background: #fff4d6;
+  color: #a15c00;
 }
+
+/* Confirmed / Approved */
 
 .appointment-status.confirmed,
 .appointment-status.approved {
-  color: #067647;
   background: #dcfae6;
+  color: #067647;
 }
 
+/* Completed */
+
 .appointment-status.completed {
-  color: #175cd3;
   background: #eff8ff;
+  color: #175cd3;
 }
+
+/* Cancelled / Rejected */
 
 .appointment-status.cancelled,
 .appointment-status.rejected {
-  color: #b42318;
   background: #fee4e2;
+  color: #b42318;
 }
 
-/* ================================
+/* =========================================
    APPOINTMENT DETAILS
-================================ */
+========================================= */
 
 .appointment-card > p {
   margin: 12px 0;
-  color: #64748b;
+  color: #66768a;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
   overflow-wrap: anywhere;
 }
 
 .appointment-card > p strong {
   display: inline-block;
   min-width: 125px;
-  color: #334155;
+  color: #34445b;
   font-weight: 650;
 }
 
-/* ================================
-   CANCEL BUTTON
-================================ */
+/* =========================================
+   CANCEL APPOINTMENT BUTTON
+========================================= */
 
 .cancel-appointment-btn {
   width: 100%;
-  margin-top: 12px;
   padding: 11px 16px;
-  border: 1px solid #f2b8b5;
+  margin-top: 13px;
+  border: 1px solid #f3c2be;
   border-radius: 8px;
   background: #fff7f6;
   color: #c0392b;
@@ -334,26 +346,18 @@
 }
 
 .cancel-appointment-btn:hover {
-  color: #ffffff;
-  background: #d92d20;
   border-color: #d92d20;
+  background: #d92d20;
+  color: #ffffff;
 }
 
-/* ================================
-   RESPONSIVE DESIGN
-================================ */
+/* =========================================
+   TABLET RESPONSIVE
+========================================= */
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .appointments-container {
-    padding: 30px 18px 50px;
-  }
-
-  .appointments-header h1 {
-    font-size: 27px;
-  }
-
-  .appointment-form-section {
-    padding: 24px 20px;
+    padding: 32px 22px 55px;
   }
 
   .appointments-list {
@@ -361,13 +365,17 @@
   }
 }
 
-@media (max-width: 480px) {
+/* =========================================
+   MOBILE RESPONSIVE
+========================================= */
+
+@media (max-width: 600px) {
   .appointments-container {
-    padding: 25px 14px 40px;
+    padding: 25px 15px 45px;
   }
 
   .appointments-header h1 {
-    font-size: 24px;
+    font-size: 26px;
   }
 
   .appointments-header p {
@@ -375,7 +383,7 @@
   }
 
   .appointment-form-section {
-    padding: 20px 16px;
+    padding: 22px 17px;
     border-radius: 12px;
   }
 
@@ -394,5 +402,32 @@
 
   .appointment-card > p strong {
     min-width: 105px;
+  }
+
+  .appointment-message {
+    font-size: 13px;
+    padding: 12px 14px;
+  }
+}
+
+/* =========================================
+   SMALL MOBILE
+========================================= */
+
+@media (max-width: 380px) {
+  .appointments-container {
+    padding-right: 11px;
+    padding-left: 11px;
+  }
+
+  .appointment-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-size: 13px;
   }
 }
