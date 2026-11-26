@@ -61,6 +61,7 @@ FEATURES = [
     str(s).strip().lower()
     for s in encoder.classes_
 ]
+
 FEATURE_SET = set(FEATURES)
 
 
@@ -76,11 +77,9 @@ def load_image_model():
         return None
 
     try:
-        # The updated training script uses a built-in Rescaling
-        # layer, so it no longer needs a Lambda custom function.
         model = tf.keras.models.load_model(
             IMAGE_MODEL_PATH,
-            compile=False,
+            compile=False
         )
 
         print("Image model loaded successfully.")
@@ -105,7 +104,7 @@ def health():
         "service": "HealthAI Python ML service",
         "symptom_model_loaded": True,
         "image_model_loaded": image_model is not None,
-        "supported_symptom_count": len(FEATURES),
+        "supported_symptom_count": len(FEATURES)
     })
 
 
@@ -113,12 +112,12 @@ def health():
 def get_supported_symptoms():
     return jsonify({
         "success": True,
-        "symptoms": FEATURES,
+        "symptoms": FEATURES
     })
 
 
 # --------------------------------------------------
-# 5. EXISTING SYMPTOM PREDICTION
+# 5. SYMPTOM PREDICTION
 # --------------------------------------------------
 
 def normalize_symptom(value):
@@ -127,12 +126,13 @@ def normalize_symptom(value):
 
 @app.post("/predict")
 def predict():
+
     data = request.get_json(silent=True)
 
     if not isinstance(data, dict):
         return jsonify({
             "success": False,
-            "message": "Request body must be a JSON object.",
+            "message": "Request body must be a JSON object."
         }), 400
 
     symptoms = data.get("symptoms")
@@ -140,13 +140,13 @@ def predict():
     if not isinstance(symptoms, list) or not symptoms:
         return jsonify({
             "success": False,
-            "message": "Please provide a non-empty symptoms list.",
+            "message": "Please provide a non-empty symptoms list."
         }), 400
 
     if not all(isinstance(s, str) for s in symptoms):
         return jsonify({
             "success": False,
-            "message": "Every symptom must be a string.",
+            "message": "Every symptom must be a string."
         }), 400
 
     normalized = {
@@ -158,7 +158,7 @@ def predict():
     if not normalized:
         return jsonify({
             "success": False,
-            "message": "Please select at least one valid symptom.",
+            "message": "Please select at least one valid symptom."
         }), 400
 
     matched = sorted(normalized & FEATURE_SET)
@@ -176,11 +176,14 @@ def predict():
                 "the training dataset."
             ),
             "unknownSymptoms": unknown,
-            "supportedSymptoms": FEATURES,
+            "supportedSymptoms": FEATURES
         }), 400
 
     feature_row = encoder.transform([matched])
-    prediction = str(symptom_model.predict(feature_row)[0])
+
+    prediction = str(
+        symptom_model.predict(feature_row)[0]
+    )
 
     return jsonify({
         "success": True,
@@ -191,7 +194,7 @@ def predict():
         "message": (
             "Educational demonstration only. "
             "Not validated for medical diagnosis."
-        ),
+        )
     })
 
 
@@ -201,14 +204,15 @@ def predict():
 
 @app.post("/predict-image")
 def predict_image():
+
     if image_model is None:
         return jsonify({
             "success": False,
             "message": (
                 "Image model is not loaded. Check image_model.keras "
-                "and the Flask terminal for model-loading errors."
+                "and the Flask logs for model-loading errors."
             ),
-            "educational_only": True,
+            "educational_only": True
         }), 503
 
     uploaded_file = request.files.get("image")
@@ -219,7 +223,7 @@ def predict_image():
             "message": (
                 "Please upload a chest X-ray using "
                 "the form field 'image'."
-            ),
+            )
         }), 400
 
     try:
@@ -230,42 +234,43 @@ def predict_image():
         if not raw_bytes:
             return jsonify({
                 "success": False,
-                "message": "The uploaded image is empty.",
+                "message": "The uploaded image is empty."
             }), 400
 
         if len(raw_bytes) > MAX_IMAGE_BYTES:
             return jsonify({
                 "success": False,
-                "message": "Image must be 10 MB or smaller.",
+                "message": "Image must be 10 MB or smaller."
             }), 413
 
-        # Verify the real image format.
+        # Verify actual image format
         with Image.open(io.BytesIO(raw_bytes)) as img:
+
             if img.format not in ("JPEG", "PNG"):
                 return jsonify({
                     "success": False,
-                    "message": "Upload a JPG or PNG image.",
+                    "message": "Upload a JPG or PNG image."
                 }), 400
 
             img.verify()
 
-        # Resize and convert to RGB.
-        # The model performs MobileNetV2 rescaling internally.
+        # Resize and convert to RGB
         with Image.open(io.BytesIO(raw_bytes)) as img:
+
             img = img.convert("RGB")
             img = img.resize(IMAGE_SIZE)
 
             image_array = np.asarray(
                 img,
-                dtype=np.float32,
+                dtype=np.float32
             )
 
         batch = np.expand_dims(image_array, axis=0)
 
-        # Run model inference.
+        # Model prediction
         output = image_model.predict(
             batch,
-            verbose=0,
+            verbose=0
         )
 
         score = float(
@@ -280,14 +285,14 @@ def predict_image():
         # Training class mapping:
         # NORMAL = 0
         # PNEUMONIA = 1
+
         prediction = (
             "PNEUMONIA"
             if score >= 0.5
             else "NORMAL"
         )
 
-        # This is the model's score for the predicted class,
-        # not a clinically calibrated probability.
+        # Model score for predicted class
         class_score = (
             score
             if prediction == "PNEUMONIA"
@@ -295,6 +300,7 @@ def predict_image():
         )
 
         if prediction == "PNEUMONIA":
+
             result_title = "Pneumonia class predicted"
 
             explanation = (
@@ -302,7 +308,9 @@ def predict_image():
                 "pneumonia category. This result alone "
                 "cannot establish whether pneumonia is present."
             )
+
         else:
+
             result_title = "Normal class predicted"
 
             explanation = (
@@ -336,26 +344,28 @@ def predict_image():
             "recommendation": recommendation,
             "message": explanation,
             "educational_only": True,
-            "disclaimer": disclaimer,
+            "disclaimer": disclaimer
         }), 200
 
     except (UnidentifiedImageError, OSError, ValueError) as exc:
+
         return jsonify({
             "success": False,
             "message": f"Unable to analyze image: {exc}",
-            "educational_only": True,
+            "educational_only": True
         }), 400
 
     except Exception:
+
         app.logger.exception("Image prediction failed")
 
         return jsonify({
             "success": False,
             "message": (
                 "Image analysis failed on the ML service. "
-                "Check the Flask terminal."
+                "Check the Flask logs."
             ),
-            "educational_only": True,
+            "educational_only": True
         }), 500
 
 
@@ -367,20 +377,17 @@ def predict_image():
 def request_too_large(error):
     return jsonify({
         "success": False,
-        "message": "Image must be 10 MB or smaller.",
+        "message": "Image must be 10 MB or smaller."
     }), 413
 
 
 # --------------------------------------------------
-# 8. START FLASK
+# 8. START FLASK SERVER
 # --------------------------------------------------
 
 if __name__ == "__main__":
     app.run(
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=5001,
-        debug=False,
-
+        debug=False
     )
-    
-#venv\Scripts\activate
